@@ -1,0 +1,1007 @@
+import React, { useState, useRef } from 'react';
+import { Scale, Barcode, ShoppingCart, Package, Settings, LogOut, Trash2, Edit, Plus, Save, X, Receipt, FileText, Wifi, WifiOff, UserPlus } from 'lucide-react';
+
+const API_URL = 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI';
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('login');
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [currentWeight, setCurrentWeight] = useState('');
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [config, setConfig] = useState({});
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [scaleWeight, setScaleWeight] = useState(0);
+  const [scaleConnected, setScaleConnected] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [clientes, setClientes] = useState([]);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [saleForInvoice, setSaleForInvoice] = useState(null);
+  const barcodeRef = useRef(null);
+  const scalePortRef = useRef(null);
+
+  const callAPI = async (action, data = {}) => {
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action, ...data })
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error en API:', error);
+      return { success: false, message: 'Error de conexión' };
+    }
+  };
+
+  const handleLogin = async () => {
+    if (API_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
+      if (loginUsername === 'admin' && loginPassword === 'admin123') {
+        setUser({ usuario: 'admin', rol: 'ADMIN', nombre: 'Administrador' });
+        setView('admin');
+        setProducts([
+          {id: '1', barcode: '7501234567890', name: 'Carne de Res', category: 'Res', pricePerKg: 150, stockKg: 50},
+          {id: '2', barcode: '7501234567891', name: 'Carne de Cerdo', category: 'Cerdo', pricePerKg: 120, stockKg: 30},
+          {id: '3', barcode: '7501234567892', name: 'Pollo Entero', category: 'Pollo', pricePerKg: 80, stockKg: 40},
+          {id: '4', barcode: '7501234567893', name: 'Chorizo', category: 'Embutidos', pricePerKg: 95, stockKg: 25}
+        ]);
+        setConfig({'Nombre Negocio': 'Carnicería San José', 'Moneda': 'MXN', 'IVA %': '16', 'RFC': 'XAXX010101000'});
+        setClientes([
+          {id: '1', nombre: 'Público General', rfc: 'XAXX010101000', email: '', telefono: '', direccion: ''},
+          {id: '2', nombre: 'Juan Pérez', rfc: 'PERJ850101ABC', email: 'juan@email.com', telefono: '555-1111', direccion: 'Calle 1'}
+        ]);
+        return;
+      } else if (loginUsername === 'vendedor' && loginPassword === 'vend123') {
+        setUser({ usuario: 'vendedor', rol: 'VENDEDOR', nombre: 'Vendedor 1' });
+        setView('sales');
+        setProducts([
+          {id: '1', barcode: '7501234567890', name: 'Carne de Res', category: 'Res', pricePerKg: 150, stockKg: 50},
+          {id: '2', barcode: '7501234567891', name: 'Carne de Cerdo', category: 'Cerdo', pricePerKg: 120, stockKg: 30},
+          {id: '3', barcode: '7501234567892', name: 'Pollo Entero', category: 'Pollo', pricePerKg: 80, stockKg: 40},
+          {id: '4', barcode: '7501234567893', name: 'Chorizo', category: 'Embutidos', pricePerKg: 95, stockKg: 25}
+        ]);
+        setClientes([
+          {id: '1', nombre: 'Público General', rfc: 'XAXX010101000', email: '', telefono: '', direccion: ''},
+          {id: '2', nombre: 'Juan Pérez', rfc: 'PERJ850101ABC', email: 'juan@email.com', telefono: '555-1111', direccion: 'Calle 1'}
+        ]);
+        return;
+      } else {
+        alert('Usuario o contraseña incorrectos');
+        return;
+      }
+    }
+
+    const result = await callAPI('login', { username: loginUsername, password: loginPassword });
+    
+    if (result.success) {
+      setUser(result.data);
+      setView(result.data.rol === 'ADMIN' ? 'admin' : 'sales');
+      loadProducts();
+      loadConfig();
+      loadClientes();
+      setLoginUsername('');
+      setLoginPassword('');
+    } else {
+      alert(result.message);
+    }
+  };
+
+  const loadProducts = async () => {
+    const result = await callAPI('getProducts');
+    if (result.success) {
+      setProducts(result.data);
+    }
+  };
+
+  const loadConfig = async () => {
+    const result = await callAPI('getConfig');
+    if (result.success) {
+      setConfig(result.data);
+    }
+  };
+
+  const loadClientes = async () => {
+    const result = await callAPI('getClientes');
+    if (result.success) {
+      setClientes(result.data);
+    }
+  };
+
+  const connectScale = async () => {
+    if ('serial' in navigator) {
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        scalePortRef.current = port;
+        setScaleConnected(true);
+        readScaleData(port);
+        alert('Báscula conectada correctamente');
+      } catch (error) {
+        alert('Error al conectar báscula: ' + error.message);
+      }
+    } else {
+      alert('Tu navegador no soporta Web Serial API. Usa Chrome o Edge.');
+    }
+  };
+
+  const readScaleData = async (port) => {
+    const reader = port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const text = new TextDecoder().decode(value);
+        const weight = parseWeight(text);
+        if (weight !== null) {
+          setScaleWeight(weight);
+          setCurrentWeight(weight.toFixed(2));
+        }
+      }
+    } catch (error) {
+      console.error('Error leyendo báscula:', error);
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
+  const parseWeight = (data) => {
+    const match = data.match(/(\d+\.?\d*)/);
+    return match ? parseFloat(match[0]) : null;
+  };
+
+  const disconnectScale = async () => {
+    if (scalePortRef.current) {
+      await scalePortRef.current.close();
+      scalePortRef.current = null;
+      setScaleConnected(false);
+      setScaleWeight(0);
+      alert('Báscula desconectada');
+    }
+  };
+
+  const searchProductByBarcode = async (barcode) => {
+    const result = await callAPI('getProductByBarcode', { barcode });
+    if (result.success) {
+      return result.data;
+    }
+    return null;
+  };
+
+  const handleBarcodeSubmit = async () => {
+    if (!barcodeInput.trim()) return;
+
+    const product = await searchProductByBarcode(barcodeInput);
+    if (product) {
+      if (currentWeight && parseFloat(currentWeight) > 0) {
+        addToCart(product, parseFloat(currentWeight));
+        setCurrentWeight('');
+      } else {
+        alert('Por favor ingresa el peso del producto');
+      }
+    } else {
+      alert('Producto no encontrado');
+    }
+    setBarcodeInput('');
+  };
+
+  const addSelectedProductToCart = () => {
+    if (!selectedProduct) {
+      alert('Selecciona un producto');
+      return;
+    }
+    if (!currentWeight || parseFloat(currentWeight) <= 0) {
+      alert('Ingresa un peso válido');
+      return;
+    }
+    addToCart(selectedProduct, parseFloat(currentWeight));
+    setCurrentWeight('');
+    setSelectedProduct(null);
+  };
+
+  const addToCart = (product, weight) => {
+    const subtotal = weight * product.pricePerKg;
+    const item = {
+      ...product,
+      weight: weight,
+      subtotal: subtotal
+    };
+    setCart([...cart, item]);
+  };
+
+  const removeFromCart = (index) => {
+    setCart(cart.filter((_, i) => i !== index));
+  };
+
+  const completeSale = async () => {
+    if (cart.length === 0) {
+      alert('El carrito está vacío');
+      return;
+    }
+
+    const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    const saleId = 'V' + Date.now();
+    const sale = {
+      saleId: saleId,
+      seller: user.nombre,
+      items: cart,
+      total: total,
+      paymentMethod: 'Efectivo',
+      date: new Date()
+    };
+
+    if (API_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
+      setSaleForInvoice(sale);
+      setShowInvoiceModal(true);
+      return;
+    }
+
+    const result = await callAPI('saveSale', { sale });
+    if (result.success) {
+      setSaleForInvoice({...sale, saleId: result.data.saleId});
+      setShowInvoiceModal(true);
+    } else {
+      alert('Error al guardar la venta');
+    }
+  };
+
+  const InvoiceModal = () => {
+    const [invoiceType, setInvoiceType] = useState('NORMAL');
+    const [selectedCliente, setSelectedCliente] = useState(clientes[0] || null);
+    const [newClienteData, setNewClienteData] = useState({nombre: '', rfc: '', email: '', telefono: '', direccion: ''});
+    const [showNewClienteForm, setShowNewClienteForm] = useState(false);
+
+    const generateInvoice = async () => {
+      if (!selectedCliente) {
+        alert('Selecciona un cliente');
+        return;
+      }
+
+      const subtotal = saleForInvoice.total / 1.16;
+      const iva = saleForInvoice.total - subtotal;
+
+      const invoice = {
+        saleId: saleForInvoice.saleId,
+        clienteNombre: selectedCliente.nombre,
+        clienteRFC: selectedCliente.rfc,
+        subtotal: subtotal,
+        iva: iva,
+        total: saleForInvoice.total,
+        tipo: invoiceType
+      };
+
+      if (API_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
+        const folio = 'F' + Date.now();
+        const uuid = invoiceType === 'ELECTRONICA' ? 'DEMO-' + Math.random().toString(36).substring(7) : '';
+        alert('Factura generada (MODO DEMO)\nFolio: ' + folio + '\nTipo: ' + invoiceType + (uuid ? '\nUUID: ' + uuid : ''));
+        printInvoice({...invoice, folio, uuid});
+        setShowInvoiceModal(false);
+        setCart([]);
+        return;
+      }
+
+      const result = await callAPI('saveInvoice', { invoice });
+      if (result.success) {
+        alert('Factura generada\nFolio: ' + result.data.folio);
+        printInvoice({...invoice, folio: result.data.folio, uuid: result.data.uuid});
+        setShowInvoiceModal(false);
+        setCart([]);
+        loadProducts();
+      }
+    };
+
+    const addNewCliente = () => {
+      if (!newClienteData.nombre || !newClienteData.rfc) {
+        alert('Nombre y RFC son obligatorios');
+        return;
+      }
+      const newCliente = {...newClienteData, id: Date.now().toString()};
+      setClientes([...clientes, newCliente]);
+      setSelectedCliente(newCliente);
+      setShowNewClienteForm(false);
+      setNewClienteData({nombre: '', rfc: '', email: '', telefono: '', direccion: ''});
+      alert('Cliente agregado correctamente');
+    };
+
+    const printInvoice = (invoiceData) => {
+      const printWindow = window.open('', '_blank');
+      const itemsHtml = saleForInvoice.items.map(item => 
+        '<tr><td>' + item.name + '</td><td>' + item.weight + '</td><td>$' + item.pricePerKg + '</td><td>$' + item.subtotal.toFixed(2) + '</td></tr>'
+      ).join('');
+      
+      printWindow.document.write(
+        '<html><head><title>Factura ' + invoiceData.folio + '</title>' +
+        '<style>body{font-family:Arial,sans-serif;padding:20px}.header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px}' +
+        '.info{margin:20px 0}.items{width:100%;border-collapse:collapse;margin:20px 0}' +
+        '.items th,.items td{border:1px solid #ddd;padding:8px;text-align:left}' +
+        '.items th{background-color:#f2f2f2}.totals{text-align:right;margin:20px 0}' +
+        '.footer{margin-top:40px;text-align:center;font-size:12px}</style></head><body>' +
+        '<div class="header"><h1>' + (config['Nombre Negocio'] || 'Carnicería') + '</h1>' +
+        '<p>RFC: ' + (config['RFC'] || 'XAXX010101000') + '</p>' +
+        '<p>' + (config['Dirección'] || '') + ' - ' + (config['Teléfono'] || '') + '</p>' +
+        '<h2>FACTURA ' + invoiceData.tipo + '</h2><p>Folio: ' + invoiceData.folio + '</p>' +
+        (invoiceData.uuid ? '<p>UUID: ' + invoiceData.uuid + '</p>' : '') + '</div>' +
+        '<div class="info"><p><strong>Cliente:</strong> ' + invoiceData.clienteNombre + '</p>' +
+        '<p><strong>RFC:</strong> ' + invoiceData.clienteRFC + '</p>' +
+        '<p><strong>Fecha:</strong> ' + new Date().toLocaleString() + '</p></div>' +
+        '<table class="items"><thead><tr><th>Producto</th><th>Peso (Kg)</th><th>Precio/Kg</th><th>Subtotal</th></tr></thead>' +
+        '<tbody>' + itemsHtml + '</tbody></table>' +
+        '<div class="totals"><p><strong>Subtotal:</strong> $' + invoiceData.subtotal.toFixed(2) + '</p>' +
+        '<p><strong>IVA (16%):</strong> $' + invoiceData.iva.toFixed(2) + '</p>' +
+        '<p style="font-size:20px"><strong>TOTAL:</strong> $' + invoiceData.total.toFixed(2) + '</p></div>' +
+        '<div class="footer"><p>Gracias por su compra</p>' +
+        (invoiceData.tipo === 'ELECTRONICA' ? '<p>Este documento es una representación impresa de un CFDI</p>' : '') +
+        '</div></body></html>'
+      );
+      printWindow.document.close();
+      printWindow.print();
+    };
+
+    if (!showInvoiceModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Generar Factura</h2>
+              <button onClick={() => {setShowInvoiceModal(false); setCart([]);}} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Tipo de Factura</label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setInvoiceType('NORMAL')}
+                  className={'p-4 border-2 rounded-lg font-semibold transition ' + (invoiceType === 'NORMAL' ? 'border-red-600 bg-red-50' : 'border-gray-300')}
+                >
+                  <FileText className="w-6 h-6 mx-auto mb-2" />
+                  Factura Normal
+                </button>
+                <button
+                  onClick={() => setInvoiceType('ELECTRONICA')}
+                  className={'p-4 border-2 rounded-lg font-semibold transition ' + (invoiceType === 'ELECTRONICA' ? 'border-red-600 bg-red-50' : 'border-gray-300')}
+                >
+                  <Receipt className="w-6 h-6 mx-auto mb-2" />
+                  Factura Electrónica
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium">Cliente</label>
+                <button
+                  onClick={() => setShowNewClienteForm(!showNewClienteForm)}
+                  className="text-sm text-red-600 hover:text-red-700 flex items-center gap-1"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Nuevo Cliente
+                </button>
+              </div>
+
+              {showNewClienteForm ? (
+                <div className="border border-gray-300 rounded-lg p-4 mb-4 space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Nombre *"
+                    value={newClienteData.nombre}
+                    onChange={(e) => setNewClienteData({...newClienteData, nombre: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="RFC *"
+                    value={newClienteData.rfc}
+                    onChange={(e) => setNewClienteData({...newClienteData, rfc: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={newClienteData.email}
+                    onChange={(e) => setNewClienteData({...newClienteData, email: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Teléfono"
+                    value={newClienteData.telefono}
+                    onChange={(e) => setNewClienteData({...newClienteData, telefono: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Dirección"
+                    value={newClienteData.direccion}
+                    onChange={(e) => setNewClienteData({...newClienteData, direccion: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  <button
+                    onClick={addNewCliente}
+                    className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700"
+                  >
+                    Agregar Cliente
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={selectedCliente?.id || ''}
+                  onChange={(e) => setSelectedCliente(clientes.find(c => c.id === e.target.value))}
+                  className="w-full px-4 py-2 border rounded-lg"
+                >
+                  {clientes.map(cliente => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nombre} - {cliente.rfc}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-bold mb-2">Resumen de Venta</h3>
+              <div className="space-y-1 text-sm">
+                <p>Subtotal: ${(saleForInvoice.total / 1.16).toFixed(2)}</p>
+                <p>IVA (16%): ${(saleForInvoice.total - (saleForInvoice.total / 1.16)).toFixed(2)}</p>
+                <p className="text-lg font-bold">Total: ${saleForInvoice.total.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {setShowInvoiceModal(false); setCart([]);}}
+                className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600"
+              >
+                Sin Factura
+              </button>
+              <button
+                onClick={generateInvoice}
+                className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                <Receipt className="w-5 h-5" />
+                Generar Factura
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const LoginView = () => (
+    <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Scale className="w-10 h-10 text-red-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800">Sistema Carnicería</h1>
+          <p className="text-gray-600 mt-2">Ingresa tus credenciales</p>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Usuario</label>
+            <input
+              type="text"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Ingresa tu usuario"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Ingresa tu contraseña"
+            />
+          </div>
+          
+          <button
+            onClick={handleLogin}
+            className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition"
+          >
+            Iniciar Sesión
+          </button>
+        </div>
+        
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
+          <p className="font-semibold mb-2 text-green-600">Sistema funcionando en MODO DEMO</p>
+          <p className="mb-3">Puedes usar estos usuarios de prueba:</p>
+          <div className="space-y-1">
+            <p className="font-mono bg-white p-2 rounded">Admin: <span className="font-bold">admin</span> / <span className="font-bold">admin123</span></p>
+            <p className="font-mono bg-white p-2 rounded">Vendedor: <span className="font-bold">vendedor</span> / <span className="font-bold">vend123</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SalesView = () => (
+    <div className="min-h-screen bg-gray-100">
+      <InvoiceModal />
+      <div className="bg-red-600 text-white p-4 shadow-lg">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <Scale className="w-8 h-8" />
+            <div>
+              <h1 className="text-2xl font-bold">Sistema de Ventas</h1>
+              <p className="text-sm opacity-90">Vendedor: {user.nombre}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={scaleConnected ? disconnectScale : connectScale}
+              className={'flex items-center gap-2 px-4 py-2 rounded-lg transition ' + (scaleConnected ? 'bg-green-700 hover:bg-green-800' : 'bg-yellow-700 hover:bg-yellow-800')}
+            >
+              {scaleConnected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
+              {scaleConnected ? 'Báscula OK' : 'Conectar Báscula'}
+            </button>
+            <button
+              onClick={() => {
+                setUser(null);
+                setView('login');
+                setCart([]);
+                if (scaleConnected) disconnectScale();
+              }}
+              className="flex items-center gap-2 bg-red-700 px-4 py-2 rounded-lg hover:bg-red-800 transition"
+            >
+              <LogOut className="w-5 h-5" />
+              Salir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          {scaleConnected && (
+            <div className="bg-green-50 border-2 border-green-500 rounded-xl p-4 flex items-center gap-3">
+              <Scale className="w-8 h-8 text-green-600" />
+              <div className="flex-1">
+                <p className="text-sm text-green-700">Peso actual de la báscula</p>
+                <p className="text-3xl font-bold text-green-900">{scaleWeight.toFixed(2)} Kg</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Barcode className="w-6 h-6 text-red-600" />
+              <h2 className="text-xl font-bold">Escanear Producto</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Código de Barras</label>
+                <input
+                  ref={barcodeRef}
+                  type="text"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleBarcodeSubmit()}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-mono focus:ring-2 focus:ring-red-500"
+                  placeholder="Escanea o ingresa el código"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Peso (Kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={currentWeight}
+                  onChange={(e) => setCurrentWeight(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-red-500"
+                  placeholder="0.00"
+                />
+              </div>
+              
+              <button
+                onClick={handleBarcodeSubmit}
+                className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Agregar con Escáner
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Package className="w-6 h-6 text-red-600" />
+              <h2 className="text-xl font-bold">Venta Manual</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Seleccionar Producto</label>
+                <select
+                  value={selectedProduct?.id || ''}
+                  onChange={(e) => setSelectedProduct(products.find(p => p.id === e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Selecciona un producto --</option>
+                  {products.map(product => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} - ${product.pricePerKg}/kg
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedProduct && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">{selectedProduct.category}</p>
+                  <p className="font-bold text-lg">{selectedProduct.name}</p>
+                  <p className="text-red-600 font-semibold">${selectedProduct.pricePerKg}/kg</p>
+                  <p className="text-sm text-gray-500">Stock: {selectedProduct.stockKg}kg</p>
+                </div>
+              )}
+
+              <button
+                onClick={addSelectedProductToCart}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Agregar Manualmente
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <ShoppingCart className="w-6 h-6 text-red-600" />
+            <h2 className="text-xl font-bold">Carrito de Compras</h2>
+          </div>
+          
+          {cart.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <ShoppingCart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p>El carrito está vacío</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+                {cart.map((item, index) => (
+                  <div key={index} className="p-4 border border-gray-200 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {item.weight} kg × ${item.pricePerKg}/kg
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg">${item.subtotal.toFixed(2)}</p>
+                        <button
+                          onClick={() => removeFromCart(index)}
+                          className="text-red-600 hover:text-red-800 mt-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-xl font-bold">TOTAL:</span>
+                  <span className="text-3xl font-bold text-red-600">
+                    ${cart.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2)}
+                  </span>
+                </div>
+                
+                <button
+                  onClick={completeSale}
+                  className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-lg hover:bg-green-700 transition"
+                >
+                  Completar Venta
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const AdminView = () => {
+    const [activeTab, setActiveTab] = useState('products');
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [newProduct, setNewProduct] = useState({
+      barcode: '',
+      name: '',
+      category: '',
+      pricePerKg: '',
+      stockKg: ''
+    });
+
+    const handleSaveProduct = async () => {
+      if (API_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
+        alert('MODO DEMO: Los cambios no se guardarán permanentemente.');
+        
+        if (editingProduct) {
+          const updatedProducts = products.map(p => 
+            p.id === editingProduct.id ? editingProduct : p
+          );
+          setProducts(updatedProducts);
+          alert('Producto actualizado (solo en esta sesión)');
+          setEditingProduct(null);
+        } else {
+          const newId = (products.length + 1).toString();
+          setProducts([...products, { ...newProduct, id: newId }]);
+          alert('Producto agregado (solo en esta sesión)');
+          setNewProduct({ barcode: '', name: '', category: '', pricePerKg: '', stockKg: '' });
+        }
+        return;
+      }
+
+      if (editingProduct) {
+        const result = await callAPI('updateProduct', { product: editingProduct });
+        if (result.success) {
+          alert('Producto actualizado');
+          loadProducts();
+          setEditingProduct(null);
+        }
+      } else {
+        const result = await callAPI('addProduct', { product: newProduct });
+        if (result.success) {
+          alert('Producto agregado');
+          loadProducts();
+          setNewProduct({ barcode: '', name: '', category: '', pricePerKg: '', stockKg: '' });
+        }
+      }
+    };
+
+    const handleDeleteProduct = async (id) => {
+      if (window.confirm('¿Eliminar este producto?')) {
+        const result = await callAPI('deleteProduct', { id });
+        if (result.success) {
+          alert('Producto eliminado');
+          loadProducts();
+        }
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="bg-red-600 text-white p-4 shadow-lg">
+          <div className="container mx-auto flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Settings className="w-8 h-8" />
+              <div>
+                <h1 className="text-2xl font-bold">Panel de Administración</h1>
+                <p className="text-sm opacity-90">Admin: {user.nombre}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setUser(null);
+                setView('login');
+              }}
+              className="flex items-center gap-2 bg-red-700 px-4 py-2 rounded-lg hover:bg-red-800 transition"
+            >
+              <LogOut className="w-5 h-5" />
+              Salir
+            </button>
+          </div>
+        </div>
+
+        <div className="container mx-auto p-4">
+          <div className="bg-white rounded-xl shadow-lg mb-6 p-2 flex gap-2">
+            <button
+              onClick={() => setActiveTab('products')}
+              className={'flex-1 py-3 px-4 rounded-lg font-semibold transition ' + (activeTab === 'products' ? 'bg-red-600 text-white' : 'hover:bg-gray-100')}
+            >
+              <Package className="w-5 h-5 inline mr-2" />
+              Productos
+            </button>
+            <button
+              onClick={() => setActiveTab('config')}
+              className={'flex-1 py-3 px-4 rounded-lg font-semibold transition ' + (activeTab === 'config' ? 'bg-red-600 text-white' : 'hover:bg-gray-100')}
+            >
+              <Settings className="w-5 h-5 inline mr-2" />
+              Configuración
+            </button>
+          </div>
+
+          {activeTab === 'products' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4">
+                  {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                </h2>
+                
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Código de Barras"
+                    value={editingProduct ? editingProduct.barcode : newProduct.barcode}
+                    onChange={(e) => editingProduct 
+                      ? setEditingProduct({...editingProduct, barcode: e.target.value})
+                      : setNewProduct({...newProduct, barcode: e.target.value})
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  
+                  <input
+                    type="text"
+                    placeholder="Nombre del Producto"
+                    value={editingProduct ? editingProduct.name : newProduct.name}
+                    onChange={(e) => editingProduct 
+                      ? setEditingProduct({...editingProduct, name: e.target.value})
+                      : setNewProduct({...newProduct, name: e.target.value})
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  
+                  <input
+                    type="text"
+                    placeholder="Categoría"
+                    value={editingProduct ? editingProduct.category : newProduct.category}
+                    onChange={(e) => editingProduct 
+                      ? setEditingProduct({...editingProduct, category: e.target.value})
+                      : setNewProduct({...newProduct, category: e.target.value})
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Precio por Kg"
+                    value={editingProduct ? editingProduct.pricePerKg : newProduct.pricePerKg}
+                    onChange={(e) => editingProduct 
+                      ? setEditingProduct({...editingProduct, pricePerKg: e.target.value})
+                      : setNewProduct({...newProduct, pricePerKg: e.target.value})
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Stock en Kg"
+                    value={editingProduct ? editingProduct.stockKg : newProduct.stockKg}
+                    onChange={(e) => editingProduct 
+                      ? setEditingProduct({...editingProduct, stockKg: e.target.value})
+                      : setNewProduct({...newProduct, stockKg: e.target.value})
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveProduct}
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+                    >
+                      <Save className="w-5 h-5" />
+                      Guardar
+                    </button>
+                    {editingProduct && (
+                      <button
+                        onClick={() => setEditingProduct(null)}
+                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4">Lista de Productos</h2>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {products.map(product => (
+                    <div key={product.id} className="p-4 border rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-bold">{product.name}</p>
+                          <p className="text-sm text-gray-600">{product.category}</p>
+                          <p className="text-xs text-gray-500">{product.barcode}</p>
+                          <p className="text-sm mt-1">
+                            <span className="font-semibold">${product.pricePerKg}/kg</span>
+                            <span className="text-gray-500 ml-2">Stock: {product.stockKg}kg</span>
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingProduct(product)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'config' && (
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl mx-auto">
+              <h2 className="text-xl font-bold mb-6">Configuración del Sistema</h2>
+              
+              <div className="space-y-6">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="font-bold mb-2">URL de Google Apps Script</h3>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Reemplaza la constante API_URL en el código con tu URL de Google Apps Script
+                  </p>
+                  <code className="block p-3 bg-white border rounded text-sm font-mono break-all">
+                    {API_URL}
+                  </code>
+                </div>
+
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="font-bold mb-2">Configuración Actual</h3>
+                  {Object.entries(config).map(([key, value]) => (
+                    <div key={key} className="flex justify-between py-2 border-b last:border-0">
+                      <span className="font-medium">{key}:</span>
+                      <span>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h3 className="font-bold mb-2">Instrucciones de Instalación</h3>
+                  <ol className="text-sm space-y-2 list-decimal list-inside">
+                    <li>Crear nueva hoja de cálculo en Google Sheets</li>
+                    <li>Ir a Extensiones → Apps Script</li>
+                    <li>Pegar el código Code.gs proporcionado</li>
+                    <li>Ejecutar la función setupDatabase()</li>
+                    <li>Publicar como aplicación web</li>
+                    <li>Copiar la URL y actualizar API_URL en este código</li>
+                  </ol>
+                </div>
+
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <h3 className="font-bold mb-2">Conectar Báscula</h3>
+                  <p className="text-sm mb-2">Para conectar una báscula digital:</p>
+                  <ul className="text-sm space-y-1 list-disc list-inside">
+                    <li>Usa Chrome o Edge (Web Serial API requerido)</li>
+                    <li>Conecta la báscula por USB/Serial</li>
+                    <li>Click en el botón "Conectar Báscula"</li>
+                    <li>Selecciona el puerto COM correcto</li>
+                    <li>El peso se actualizará automáticamente</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (!user) return <LoginView />;
+  if (user.rol === 'ADMIN') return <AdminView />;
+  return <SalesView />;
+};
+
+export default App;
