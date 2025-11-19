@@ -88,10 +88,10 @@
                             {id: '3', barcode: '7501234567892', name: 'Pollo Entero', category: 'Pollo', pricePerKg: 80, stockKg: 40},
                             {id: '4', barcode: '7501234567893', name: 'Chorizo', category: 'Embutidos', pricePerKg: 95, stockKg: 25}
                         ]);
-                        setConfig({'Nombre Negocio': 'Carnicería San José', 'Moneda': 'MXN', 'IVA %': '16', 'RFC': 'XAXX010101000'});
+                        setConfig({'Nombre Negocio': 'Carnicería San José', 'Moneda': 'COP', 'IVA %': '19', 'NIT': '900123456-7', 'Razón Social': 'Carnicería San José S.A.S', 'Prefijo Factura': 'SETT', 'Consecutivo Actual': '1'});
                         setClientes([
-                            {id: '1', nombre: 'Público General', rfc: 'XAXX010101000', email: '', telefono: '', direccion: ''},
-                            {id: '2', nombre: 'Juan Pérez', rfc: 'PERJ850101ABC', email: 'juan@email.com', telefono: '555-1111', direccion: 'Calle 1'}
+                            {id: '1', nombre: 'Consumidor Final', tipoDoc: 'NIT', numeroDoc: '222222222222', email: '', telefono: '', direccion: '', ciudad: 'Bogotá', departamento: 'Cundinamarca'},
+                            {id: '2', nombre: 'Juan Pérez Gómez', tipoDoc: 'CC', numeroDoc: '1234567890', email: 'juan@email.com', telefono: '3001234567', direccion: 'Calle 10 #20-30', ciudad: 'Bogotá', departamento: 'Cundinamarca'}
                         ]);
                         return;
                     } else if (loginUsername === 'vendedor' && loginPassword === 'vend123') {
@@ -104,8 +104,8 @@
                             {id: '4', barcode: '7501234567893', name: 'Chorizo', category: 'Embutidos', pricePerKg: 95, stockKg: 25}
                         ]);
                         setClientes([
-                            {id: '1', nombre: 'Público General', rfc: 'XAXX010101000', email: '', telefono: '', direccion: ''},
-                            {id: '2', nombre: 'Juan Pérez', rfc: 'PERJ850101ABC', email: 'juan@email.com', telefono: '555-1111', direccion: 'Calle 1'}
+                            {id: '1', nombre: 'Consumidor Final', tipoDoc: 'NIT', numeroDoc: '222222222222', email: '', telefono: '', direccion: '', ciudad: 'Bogotá', departamento: 'Cundinamarca'},
+                            {id: '2', nombre: 'Juan Pérez Gómez', tipoDoc: 'CC', numeroDoc: '1234567890', email: 'juan@email.com', telefono: '3001234567', direccion: 'Calle 10 #20-30', ciudad: 'Bogotá', departamento: 'Cundinamarca'}
                         ]);
                         return;
                     } else {
@@ -277,7 +277,7 @@
             const InvoiceModal = () => {
                 const [invoiceType, setInvoiceType] = useState('NORMAL');
                 const [selectedCliente, setSelectedCliente] = useState(clientes[0] || null);
-                const [newClienteData, setNewClienteData] = useState({nombre: '', rfc: '', email: '', telefono: '', direccion: ''});
+                const [newClienteData, setNewClienteData] = useState({nombre: '', tipoDoc: 'CC', numeroDoc: '', email: '', telefono: '', direccion: '', ciudad: '', departamento: ''});
                 const [showNewClienteForm, setShowNewClienteForm] = useState(false);
 
                 const generateInvoice = async () => {
@@ -286,18 +286,19 @@
                         return;
                     }
 
-                    const subtotal = saleForInvoice.total / 1.16;
+                    const subtotal = saleForInvoice.total / 1.19; // IVA 19% Colombia
                     const iva = saleForInvoice.total - subtotal;
 
-                    const folio = 'F' + Date.now();
-                    const uuid = invoiceType === 'ELECTRONICA' ? 'DEMO-' + Math.random().toString(36).substring(7) : '';
+                    const folio = (config['Prefijo Factura'] || 'SETT') + (config['Consecutivo Actual'] || '1');
+                    const cufe = invoiceType === 'ELECTRONICA' ? 'CUFE-DEMO-' + Math.random().toString(36).substring(7).toUpperCase() : '';
                     
-                    alert('✅ Factura generada\nFolio: ' + folio + '\nTipo: ' + invoiceType + (uuid ? '\nUUID: ' + uuid : ''));
+                    alert('✅ Factura generada\nFolio: ' + folio + '\nTipo: ' + invoiceType + (cufe ? '\nCUFE: ' + cufe : '') + '\n\n' + (invoiceType === 'ELECTRONICA' ? '📤 Enviada a la DIAN (Modo Demo)' : ''));
                     printInvoice({
                         folio,
-                        uuid,
+                        cufe,
                         clienteNombre: selectedCliente.nombre,
-                        clienteRFC: selectedCliente.rfc,
+                        clienteTipoDoc: selectedCliente.tipoDoc,
+                        clienteNumeroDoc: selectedCliente.numeroDoc,
                         subtotal,
                         iva,
                         total: saleForInvoice.total,
@@ -308,65 +309,106 @@
                 };
 
                 const addNewCliente = () => {
-                    if (!newClienteData.nombre || !newClienteData.rfc) {
-                        alert('Nombre y RFC son obligatorios');
+                    if (!newClienteData.nombre || !newClienteData.numeroDoc) {
+                        alert('Nombre y Número de Documento son obligatorios');
                         return;
                     }
                     const newCliente = {...newClienteData, id: Date.now().toString()};
                     setClientes([...clientes, newCliente]);
                     setSelectedCliente(newCliente);
                     setShowNewClienteForm(false);
-                    setNewClienteData({nombre: '', rfc: '', email: '', telefono: '', direccion: ''});
+                    setNewClienteData({nombre: '', tipoDoc: 'CC', numeroDoc: '', email: '', telefono: '', direccion: '', ciudad: '', departamento: ''});
                     alert('Cliente agregado correctamente');
                 };
 
                 const printInvoice = (invoiceData) => {
                     const printWindow = window.open('', '_blank');
                     const itemsHtml = saleForInvoice.items.map(item => 
-                        `<tr><td>${item.name}</td><td>${item.weight}</td><td>$${item.pricePerKg}</td><td>$${item.subtotal.toFixed(2)}</td></tr>`
+                        `<tr><td>${item.name}</td><td>${item.weight}</td><td>${item.pricePerKg.toLocaleString('es-CO')}</td><td>${item.subtotal.toLocaleString('es-CO', {minimumFractionDigits: 2})}</td></tr>`
                     ).join('');
                     
                     printWindow.document.write(`
                         <html><head><title>Factura ${invoiceData.folio}</title>
                         <style>
-                            body{font-family:Arial,sans-serif;padding:20px}
-                            .header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px}
-                            .info{margin:20px 0}
+                            body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto}
+                            .header{text-align:center;border-bottom:2px solid #000;padding-bottom:15px;margin-bottom:20px}
+                            .header h1{margin:5px 0;color:#c00}
+                            .row{display:flex;justify-content:space-between;margin:15px 0}
+                            .col{flex:1}
+                            .info-box{background:#f5f5f5;padding:10px;border-radius:5px;margin:10px 0}
                             .items{width:100%;border-collapse:collapse;margin:20px 0}
-                            .items th,.items td{border:1px solid #ddd;padding:8px;text-align:left}
-                            .items th{background-color:#f2f2f2}
-                            .totals{text-align:right;margin:20px 0}
-                            .footer{margin-top:40px;text-align:center;font-size:12px}
+                            .items th,.items td{border:1px solid #ddd;padding:10px;text-align:left}
+                            .items th{background-color:#333;color:white}
+                            .totals{text-align:right;margin:20px 0;border-top:2px solid #000;padding-top:10px}
+                            .footer{margin-top:40px;text-align:center;font-size:11px;color:#666}
+                            .cufe-box{background:#fffacd;padding:10px;margin:15px 0;border:1px solid #ffd700;border-radius:5px}
+                            .qr-section{text-align:center;margin:20px 0}
                         </style></head><body>
                         <div class="header">
                             <h1>${config['Nombre Negocio'] || 'Carnicería'}</h1>
-                            <p>RFC: ${config['RFC'] || 'XAXX010101000'}</p>
-                            <h2>FACTURA ${invoiceData.tipo}</h2>
-                            <p>Folio: ${invoiceData.folio}</p>
-                            ${invoiceData.uuid ? `<p>UUID: ${invoiceData.uuid}</p>` : ''}
+                            <p><strong>${config['Razón Social'] || ''}</strong></p>
+                            <p>NIT: ${config['NIT'] || ''}</p>
+                            <p>${config['Dirección'] || ''} - ${config['Ciudad'] || ''}, ${config['Departamento'] || ''}</p>
+                            <p>Tel: ${config['Teléfono'] || ''} | Email: ${config['Email'] || ''}</p>
+                            <h2 style="margin-top:15px">FACTURA ELECTRÓNICA DE VENTA</h2>
+                            <p style="font-size:18px"><strong>${invoiceData.folio}</strong></p>
                         </div>
-                        <div class="info">
-                            <p><strong>Cliente:</strong> ${invoiceData.clienteNombre}</p>
-                            <p><strong>RFC:</strong> ${invoiceData.clienteRFC}</p>
-                            <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
+                        
+                        ${invoiceData.tipo === 'ELECTRONICA' ? `
+                        <div class="cufe-box">
+                            <strong>CUFE:</strong><br>
+                            <span style="font-size:10px;word-break:break-all">${invoiceData.cufe}</span>
                         </div>
+                        ` : ''}
+                        
+                        <div class="row">
+                            <div class="col">
+                                <div class="info-box">
+                                    <strong>DATOS DEL CLIENTE</strong><br>
+                                    <strong>Nombre:</strong> ${invoiceData.clienteNombre}<br>
+                                    <strong>${invoiceData.clienteTipoDoc}:</strong> ${invoiceData.clienteNumeroDoc}<br>
+                                    <strong>Fecha:</strong> ${new Date().toLocaleString('es-CO')}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="info-box" style="background:#e8f5e9">
+                            <strong>RESOLUCIÓN DIAN</strong><br>
+                            Número: ${config['Resolución DIAN Número'] || 'N/A'} del ${config['Resolución DIAN Fecha'] || 'N/A'}<br>
+                            Prefijo: ${config['Prefijo Factura'] || 'N/A'} | Rango autorizado: ${config['Rango Autorizado Desde'] || '1'} al ${config['Rango Autorizado Hasta'] || 'N/A'}<br>
+                            Vigencia hasta: ${config['Vigencia Hasta'] || 'N/A'}
+                        </div>
+                        
                         <table class="items">
-                            <thead><tr><th>Producto</th><th>Peso (Kg)</th><th>Precio/Kg</th><th>Subtotal</th></tr></thead>
+                            <thead><tr><th>Producto</th><th>Cantidad (Kg)</th><th>Precio Unitario</th><th>Valor</th></tr></thead>
                             <tbody>${itemsHtml}</tbody>
                         </table>
+                        
                         <div class="totals">
-                            <p><strong>Subtotal:</strong> $${invoiceData.subtotal.toFixed(2)}</p>
-                            <p><strong>IVA (16%):</strong> $${invoiceData.iva.toFixed(2)}</p>
-                            <p style="font-size:20px"><strong>TOTAL:</strong> $${invoiceData.total.toFixed(2)}</p>
+                            <p><strong>Subtotal:</strong> ${invoiceData.subtotal.toLocaleString('es-CO', {minimumFractionDigits: 2})}</p>
+                            <p><strong>IVA (19%):</strong> ${invoiceData.iva.toLocaleString('es-CO', {minimumFractionDigits: 2})}</p>
+                            <p style="font-size:22px;color:#c00"><strong>TOTAL:</strong> ${invoiceData.total.toLocaleString('es-CO', {minimumFractionDigits: 2})} COP</p>
                         </div>
+                        
+                        ${invoiceData.tipo === 'ELECTRONICA' ? `
+                        <div class="qr-section">
+                            <p><strong>Consulta la validez de esta factura en:</strong></p>
+                            <p style="font-size:12px">https://catalogo-vpfe.dian.gov.co/Document/FindDocument</p>
+                            <div style="margin:10px 0">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(invoiceData.cufe)}" alt="QR Code">
+                            </div>
+                        </div>
+                        ` : ''}
+                        
                         <div class="footer">
-                            <p>Gracias por su compra</p>
-                            ${invoiceData.tipo === 'ELECTRONICA' ? '<p>Este documento es una representación impresa de un CFDI</p>' : ''}
+                            <p><strong>Gracias por su compra</strong></p>
+                            ${invoiceData.tipo === 'ELECTRONICA' ? '<p>Este documento es una representación gráfica de la Factura Electrónica de Venta</p><p>Generada por Sistema POS integrado con DIAN</p>' : ''}
+                            <p>${config['Razón Social'] || ''} - ${config['NIT'] || ''}</p>
                         </div>
                         </body></html>
                     `);
                     printWindow.document.close();
-                    printWindow.print();
+                    setTimeout(() => printWindow.print(), 500);
                 };
 
                 if (!showInvoiceModal) return null;
@@ -416,17 +458,35 @@
 
                                     {showNewClienteForm ? (
                                         <div className="border border-gray-300 rounded-lg p-4 mb-4 space-y-3">
-                                            <input type="text" placeholder="Nombre *" value={newClienteData.nombre} onChange={(e) => setNewClienteData({...newClienteData, nombre: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
-                                            <input type="text" placeholder="RFC *" value={newClienteData.rfc} onChange={(e) => setNewClienteData({...newClienteData, rfc: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            <input type="text" placeholder="Nombre Completo *" value={newClienteData.nombre} onChange={(e) => setNewClienteData({...newClienteData, nombre: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select value={newClienteData.tipoDoc} onChange={(e) => setNewClienteData({...newClienteData, tipoDoc: e.target.value})} className="w-full px-3 py-2 border rounded-lg">
+                                                    <option value="CC">Cédula de Ciudadanía (CC)</option>
+                                                    <option value="CE">Cédula de Extranjería (CE)</option>
+                                                    <option value="NIT">NIT</option>
+                                                    <option value="TI">Tarjeta de Identidad (TI)</option>
+                                                    <option value="PA">Pasaporte (PA)</option>
+                                                    <option value="RC">Registro Civil (RC)</option>
+                                                </select>
+                                                <input type="text" placeholder="Número Documento *" value={newClienteData.numeroDoc} onChange={(e) => setNewClienteData({...newClienteData, numeroDoc: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            </div>
+                                            
                                             <input type="email" placeholder="Email" value={newClienteData.email} onChange={(e) => setNewClienteData({...newClienteData, email: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
-                                            <input type="text" placeholder="Teléfono" value={newClienteData.telefono} onChange={(e) => setNewClienteData({...newClienteData, telefono: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            <input type="text" placeholder="Teléfono (ej: 3001234567)" value={newClienteData.telefono} onChange={(e) => setNewClienteData({...newClienteData, telefono: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
                                             <input type="text" placeholder="Dirección" value={newClienteData.direccion} onChange={(e) => setNewClienteData({...newClienteData, direccion: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input type="text" placeholder="Ciudad" value={newClienteData.ciudad} onChange={(e) => setNewClienteData({...newClienteData, ciudad: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                                <input type="text" placeholder="Departamento" value={newClienteData.departamento} onChange={(e) => setNewClienteData({...newClienteData, departamento: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            </div>
+                                            
                                             <button onClick={addNewCliente} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Agregar Cliente</button>
                                         </div>
                                     ) : (
                                         <select value={selectedCliente?.id || ''} onChange={(e) => setSelectedCliente(clientes.find(c => c.id === e.target.value))} className="w-full px-4 py-2 border rounded-lg">
                                             {clientes.map(cliente => (
-                                                <option key={cliente.id} value={cliente.id}>{cliente.nombre} - {cliente.rfc}</option>
+                                                <option key={cliente.id} value={cliente.id}>{cliente.nombre} - {cliente.tipoDoc} {cliente.numeroDoc}</option>
                                             ))}
                                         </select>
                                     )}
@@ -454,6 +514,10 @@
                 );
             };
 
+                );
+            }
+
+            // Renderizar según el rol
             if (!user) {
                 return (
                     <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
@@ -493,7 +557,8 @@
                 );
             }
 
-            if (user.rol === 'ADMIN') {
+            // Vista de Administrador
+            const AdminView = () => {
                 const [activeTab, setActiveTab] = useState('products');
                 const [editingProduct, setEditingProduct] = useState(null);
                 const [newProduct, setNewProduct] = useState({barcode: '', name: '', category: '', pricePerKg: '', stockKg: ''});
@@ -505,6 +570,10 @@
                         alert('Producto actualizado');
                         setEditingProduct(null);
                     } else {
+                        if (!newProduct.barcode || !newProduct.name || !newProduct.category || !newProduct.pricePerKg || !newProduct.stockKg) {
+                            alert('Por favor completa todos los campos');
+                            return;
+                        }
                         const newId = (products.length + 1).toString();
                         setProducts([...products, { ...newProduct, id: newId }]);
                         alert('Producto agregado');
@@ -543,9 +612,13 @@
                                     <Icon name="Package" className="w-5 h-5 inline mr-2" />
                                     Productos
                                 </button>
+                                <button onClick={() => setActiveTab('dian')} className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${activeTab === 'dian' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}>
+                                    <Icon name="Receipt" className="w-5 h-5 inline mr-2" />
+                                    Config. DIAN
+                                </button>
                                 <button onClick={() => setActiveTab('config')} className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${activeTab === 'config' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}>
                                     <Icon name="Settings" className="w-5 h-5 inline mr-2" />
-                                    Configuración
+                                    General
                                 </button>
                             </div>
 
@@ -604,6 +677,178 @@
                                 </div>
                             )}
 
+                            {activeTab === 'dian' && (
+                                <div className="bg-white rounded-xl shadow-lg p-6 max-w-4xl mx-auto">
+                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        <Icon name="Receipt" className="w-6 h-6 text-red-600" />
+                                        Configuración Facturación Electrónica DIAN
+                                    </h2>
+                                    
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                                            <p className="text-sm"><strong>📌 Importante:</strong> Estos datos son necesarios para la facturación electrónica según normativa DIAN Colombia</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
+                                                <h3 className="font-bold text-lg border-b pb-2">Datos de la Empresa</h3>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">NIT *</label>
+                                                    <input type="text" placeholder="900123456-7" defaultValue={config['NIT']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Razón Social *</label>
+                                                    <input type="text" placeholder="Mi Empresa S.A.S" defaultValue={config['Razón Social']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Dirección *</label>
+                                                    <input type="text" placeholder="Calle 123 #45-67" defaultValue={config['Dirección']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">Ciudad</label>
+                                                        <input type="text" placeholder="Bogotá" defaultValue={config['Ciudad']} className="w-full px-3 py-2 border rounded-lg" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">Departamento</label>
+                                                        <input type="text" placeholder="Cundinamarca" defaultValue={config['Departamento']} className="w-full px-3 py-2 border rounded-lg" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Teléfono</label>
+                                                    <input type="text" placeholder="601-1234567" defaultValue={config['Teléfono']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Email Facturación</label>
+                                                    <input type="email" placeholder="facturacion@empresa.com" defaultValue={config['Email']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h3 className="font-bold text-lg border-b pb-2">Credenciales DIAN</h3>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Software ID *</label>
+                                                    <input type="text" placeholder="Generado por DIAN" className="w-full px-3 py-2 border rounded-lg font-mono text-sm" />
+                                                    <p className="text-xs text-gray-500 mt-1">ID del software registrado en DIAN</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Software PIN *</label>
+                                                    <input type="password" placeholder="PIN generado por DIAN" className="w-full px-3 py-2 border rounded-lg font-mono text-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Test Set ID</label>
+                                                    <input type="text" placeholder="Para pruebas" className="w-full px-3 py-2 border rounded-lg font-mono text-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Certificado Digital</label>
+                                                    <input type="file" accept=".p12,.pfx" className="w-full px-3 py-2 border rounded-lg text-sm" />
+                                                    <p className="text-xs text-gray-500 mt-1">Archivo .p12 o .pfx</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Clave Certificado</label>
+                                                    <input type="password" placeholder="Contraseña del certificado" className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Ambiente *</label>
+                                                    <select className="w-full px-3 py-2 border rounded-lg">
+                                                        <option value="HABILITACION">Habilitación (Pruebas)</option>
+                                                        <option value="PRODUCCION">Producción</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
+                                                <h3 className="font-bold text-lg border-b pb-2">Responsabilidades Fiscales</h3>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Tipo de Contribuyente</label>
+                                                    <select className="w-full px-3 py-2 border rounded-lg">
+                                                        <option value="O-13">O-13 - Gran Contribuyente</option>
+                                                        <option value="O-15">O-15 - Autorretenedor</option>
+                                                        <option value="O-23">O-23 - Agente de retención IVA</option>
+                                                        <option value="O-47">O-47 - Régimen Simple</option>
+                                                        <option value="R-99-PN">R-99-PN - No Responsable</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Régimen Fiscal</label>
+                                                    <select className="w-full px-3 py-2 border rounded-lg">
+                                                        <option value="ORDINARIO">Régimen Ordinario</option>
+                                                        <option value="SIMPLIFICADO">Régimen Simplificado</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex gap-4">
+                                                    <label className="flex items-center gap-2">
+                                                        <input type="checkbox" defaultChecked className="w-4 h-4" />
+                                                        <span className="text-sm">Responsable de IVA</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2">
+                                                        <input type="checkbox" defaultChecked className="w-4 h-4" />
+                                                        <span className="text-sm">Responsable de ICA</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h3 className="font-bold text-lg border-b pb-2">Resolución de Facturación DIAN</h3>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Prefijo *</label>
+                                                    <input type="text" placeholder="SETT" defaultValue={config['Prefijo Factura']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Número Resolución *</label>
+                                                    <input type="text" placeholder="18760000001" defaultValue={config['Resolución DIAN Número']} className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Fecha Resolución *</label>
+                                                    <input type="date" defaultValue="2024-01-15" className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">Rango Desde</label>
+                                                        <input type="number" placeholder="1" defaultValue="1" className="w-full px-3 py-2 border rounded-lg" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-1">Rango Hasta</label>
+                                                        <input type="number" placeholder="5000" defaultValue="5000" className="w-full px-3 py-2 border rounded-lg" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Vigencia Hasta</label>
+                                                    <input type="date" defaultValue="2026-01-15" className="w-full px-3 py-2 border rounded-lg" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-1">Consecutivo Actual</label>
+                                                    <input type="number" defaultValue={config['Consecutivo Actual'] || '1'} className="w-full px-3 py-2 border rounded-lg bg-gray-100" readOnly />
+                                                    <p className="text-xs text-gray-500 mt-1">Se actualiza automáticamente</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                                            <h4 className="font-bold mb-2">⚠️ Notas Importantes:</h4>
+                                            <ul className="text-sm space-y-1 list-disc list-inside">
+                                                <li>Todos los campos marcados con * son obligatorios para facturación electrónica</li>
+                                                <li>Debes obtener el Software ID y PIN desde el portal DIAN</li>
+                                                <li>El certificado digital debe ser expedido por una entidad certificadora autorizada</li>
+                                                <li>En ambiente de Habilitación puedes realizar pruebas sin afectar producción</li>
+                                                <li>Verifica que tu resolución DIAN esté vigente</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="flex gap-3">
+                                            <button className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                                                💾 Guardar Configuración
+                                            </button>
+                                            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                                                🧪 Probar Conexión DIAN
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {activeTab === 'config' && (
                                 <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl mx-auto">
                                     <h2 className="text-xl font-bold mb-6">Configuración del Sistema</h2>
@@ -645,7 +890,12 @@
                 );
             }
 
-            // Vista de Ventas
+            // Vista según el rol del usuario
+            if (user.rol === 'ADMIN') {
+                return <AdminView />;
+            }
+
+            // Vista de Ventas (resto del código)
             return (
                 <div className="min-h-screen bg-gray-100">
                     <InvoiceModal />
