@@ -37,7 +37,7 @@ const App = () => {
 
   const handleLogin = async () => {
     if (API_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-      if (loginUsername === 'admin' && loginPassword === 'admin123') {
+      if (loginUsername === 'admin' && loginPassword === 'admin123') { 
         setUser({ usuario: 'admin', rol: 'ADMIN', nombre: 'Administrador' });
         setView('admin');
         setProducts([
