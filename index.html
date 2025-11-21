@@ -8,6 +8,10 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f9fafb; }
@@ -166,12 +170,60 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        // ==================== GESTOR DE ALMACENAMIENTO ====================
+        // ==================== CONFIGURACIÓN DE FIREBASE ====================
+        // ✅ FIREBASE CONFIGURADO Y LISTO
+        // Tu proyecto: mi-carniceria-4a6b5
+        // Sincronización en la nube ACTIVA
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzUkfn8wrAYscr1EI6H7wONMMK0qc14ZA",
+            authDomain: "mi-carniceria-4a6b5.firebaseapp.com",
+            projectId: "mi-carniceria-4a6b5",
+            storageBucket: "mi-carniceria-4a6b5.firebasestorage.app",
+            messagingSenderId: "115096293476",
+            appId: "1:115096293476:web:6f7d90260feaf035a84f71"
+        };
+
+        // Inicializar Firebase
+        let db = null;
+        let firebaseEnabled = false;
+
+        try {
+            // Verificar si la configuración está completa
+            if (firebaseConfig.apiKey !== "TU_API_KEY_AQUI") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                firebaseEnabled = true;
+                console.log('🔥 Firebase conectado - Sincronización en la nube ACTIVA');
+            } else {
+                console.log('⚠️ Firebase no configurado - Usando solo localStorage (sin sincronización entre dispositivos)');
+                console.log('📖 Para activar sincronización, configura Firebase en el código');
+            }
+        } catch (error) {
+            console.error('❌ Error al inicializar Firebase:', error);
+            console.log('⚠️ Continuando con localStorage solamente');
+        }
+
+        // ==================== GESTOR DE ALMACENAMIENTO CON SINCRONIZACIÓN ====================
         const StorageManager = {
-            save: (key, data) => {
+            // ID único de la tienda (puedes cambiarlo por el NIT o nombre de tu negocio)
+            storeId: 'carniceria-principal',
+            
+            save: async (key, data) => {
                 try {
+                    // Guardar en localStorage primero (para acceso rápido)
                     localStorage.setItem(key, JSON.stringify(data));
-                    console.log(`✅ Guardado: ${key}`, data);
+                    console.log(`✅ Guardado localmente: ${key}`);
+                    
+                    // Si Firebase está habilitado, sincronizar en la nube
+                    if (firebaseEnabled && db) {
+                        await db.collection(StorageManager.storeId).doc(key).set({
+                            data: data,
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log(`☁️ Sincronizado en la nube: ${key}`);
+                    }
+                    
                     return true;
                 } catch (error) {
                     console.error(`❌ Error al guardar ${key}:`, error);
@@ -179,11 +231,28 @@
                 }
             },
             
-            load: (key, defaultValue = null) => {
+            load: async (key, defaultValue = null) => {
                 try {
+                    // Si Firebase está habilitado, intentar cargar desde la nube primero
+                    if (firebaseEnabled && db) {
+                        try {
+                            const doc = await db.collection(StorageManager.storeId).doc(key).get();
+                            if (doc.exists) {
+                                const cloudData = doc.data().data;
+                                // Actualizar localStorage con datos de la nube
+                                localStorage.setItem(key, JSON.stringify(cloudData));
+                                console.log(`☁️ Cargado desde la nube: ${key}`);
+                                return cloudData;
+                            }
+                        } catch (error) {
+                            console.log(`⚠️ No se pudo cargar desde la nube, usando localStorage`);
+                        }
+                    }
+                    
+                    // Cargar desde localStorage
                     const item = localStorage.getItem(key);
                     if (item) {
-                        console.log(`📥 Cargado: ${key}`);
+                        console.log(`📥 Cargado desde localStorage: ${key}`);
                         return JSON.parse(item);
                     }
                     return defaultValue;
@@ -193,9 +262,17 @@
                 }
             },
             
-            remove: (key) => {
+            remove: async (key) => {
                 try {
+                    // Eliminar de localStorage
                     localStorage.removeItem(key);
+                    
+                    // Eliminar de Firebase si está habilitado
+                    if (firebaseEnabled && db) {
+                        await db.collection(StorageManager.storeId).doc(key).delete();
+                        console.log(`☁️ Eliminado de la nube: ${key}`);
+                    }
+                    
                     console.log(`🗑️ Eliminado: ${key}`);
                     return true;
                 } catch (error) {
@@ -204,9 +281,20 @@
                 }
             },
             
-            clear: () => {
+            clear: async () => {
                 try {
+                    // Limpiar localStorage
                     localStorage.clear();
+                    
+                    // Limpiar Firebase si está habilitado
+                    if (firebaseEnabled && db) {
+                        const snapshot = await db.collection(StorageManager.storeId).get();
+                        const batch = db.batch();
+                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        console.log('☁️ Nube limpiada completamente');
+                    }
+                    
                     console.log('🗑️ Almacenamiento limpiado completamente');
                     return true;
                 } catch (error) {
@@ -217,30 +305,66 @@
             
             exportAll: () => {
                 const data = {
-                    productos: StorageManager.load('productos', []),
-                    ventas: StorageManager.load('ventas', []),
-                    clientes: StorageManager.load('clientes', []),
-                    usuarios: StorageManager.load('usuarios', []),
-                    dianConfig: StorageManager.load('dianConfig', {}),
-                    balanzaConfig: StorageManager.load('balanzaConfig', {}),
+                    productos: JSON.parse(localStorage.getItem('productos') || '[]'),
+                    ventas: JSON.parse(localStorage.getItem('ventas') || '[]'),
+                    clientes: JSON.parse(localStorage.getItem('clientes') || '[]'),
+                    usuarios: JSON.parse(localStorage.getItem('usuarios') || '[]'),
+                    dianConfig: JSON.parse(localStorage.getItem('dianConfig') || '{}'),
+                    balanzaConfig: JSON.parse(localStorage.getItem('balanzaConfig') || '{}'),
                     exportDate: new Date().toISOString()
                 };
                 return data;
             },
             
-            importAll: (data) => {
+            importAll: async (data) => {
                 try {
-                    if (data.productos) StorageManager.save('productos', data.productos);
-                    if (data.ventas) StorageManager.save('ventas', data.ventas);
-                    if (data.clientes) StorageManager.save('clientes', data.clientes);
-                    if (data.usuarios) StorageManager.save('usuarios', data.usuarios);
-                    if (data.dianConfig) StorageManager.save('dianConfig', data.dianConfig);
-                    if (data.balanzaConfig) StorageManager.save('balanzaConfig', data.balanzaConfig);
+                    if (data.productos) await StorageManager.save('productos', data.productos);
+                    if (data.ventas) await StorageManager.save('ventas', data.ventas);
+                    if (data.clientes) await StorageManager.save('clientes', data.clientes);
+                    if (data.usuarios) await StorageManager.save('usuarios', data.usuarios);
+                    if (data.dianConfig) await StorageManager.save('dianConfig', data.dianConfig);
+                    if (data.balanzaConfig) await StorageManager.save('balanzaConfig', data.balanzaConfig);
                     return true;
                 } catch (error) {
                     console.error('❌ Error al importar datos:', error);
                     return false;
                 }
+            },
+
+            // Función para sincronizar datos desde la nube (útil al cargar la app)
+            syncFromCloud: async () => {
+                if (!firebaseEnabled || !db) {
+                    console.log('⚠️ Firebase no está habilitado, no se puede sincronizar');
+                    return false;
+                }
+
+                try {
+                    console.log('🔄 Sincronizando datos desde la nube...');
+                    const snapshot = await db.collection(StorageManager.storeId).get();
+                    
+                    snapshot.forEach(doc => {
+                        const key = doc.id;
+                        const data = doc.data().data;
+                        localStorage.setItem(key, JSON.stringify(data));
+                    });
+                    
+                    console.log('✅ Sincronización completada');
+                    return true;
+                } catch (error) {
+                    console.error('❌ Error al sincronizar desde la nube:', error);
+                    return false;
+                }
+            },
+
+            // Verificar el estado de Firebase
+            getStatus: () => {
+                return {
+                    firebaseEnabled: firebaseEnabled,
+                    storeId: StorageManager.storeId,
+                    message: firebaseEnabled 
+                        ? '🔥 Sincronización en la nube ACTIVA - Tus datos se guardan automáticamente y están disponibles en todos tus dispositivos' 
+                        : '⚠️ Solo localStorage - Configura Firebase para sincronizar entre dispositivos'
+                };
             }
         };
 
@@ -690,6 +814,65 @@
             );
         }
 
+        // ==================== INDICADOR DE SINCRONIZACIÓN FIREBASE ====================
+        function FirebaseIndicator() {
+            const status = StorageManager.getStatus();
+            const [syncing, setSyncing] = useState(false);
+
+            const handleSync = async () => {
+                if (!status.firebaseEnabled) {
+                    alert('Firebase no está configurado. Ve a la sección de configuración para más información.');
+                    return;
+                }
+                
+                setSyncing(true);
+                const success = await StorageManager.syncFromCloud();
+                setSyncing(false);
+                
+                if (success) {
+                    alert('✅ Datos sincronizados correctamente desde la nube');
+                    window.location.reload();
+                } else {
+                    alert('❌ Error al sincronizar datos');
+                }
+            };
+
+            return (
+                <div 
+                    className={`fixed bottom-20 left-20 p-3 rounded-xl shadow-lg z-999 cursor-pointer transition-all hover:shadow-2xl ${
+                        status.firebaseEnabled 
+                            ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                            : 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                    }`}
+                    onClick={handleSync}
+                    title={status.message}
+                >
+                    <div className="flex items-center gap-3">
+                        {status.firebaseEnabled ? (
+                            <>
+                                <Icon name="Cloud" className="w-6 h-6 text-white" />
+                                <div className="text-white">
+                                    <p className="text-xs font-semibold opacity-90">Sincronización</p>
+                                    <p className="text-sm font-bold">
+                                        {syncing ? 'Sincronizando...' : 'Activa ☁️'}
+                                    </p>
+                                </div>
+                                {!syncing && <div className="w-2 h-2 bg-white rounded-full pulse"></div>}
+                            </>
+                        ) : (
+                            <>
+                                <Icon name="AlertCircle" className="w-6 h-6 text-white" />
+                                <div className="text-white">
+                                    <p className="text-xs font-semibold opacity-90">Solo Local</p>
+                                    <p className="text-sm font-bold">Sin Nube</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
         // ==================== INDICADOR DE BALANZA ====================
         function BalanzaIndicator({ balanzaConfig, currentWeight }) {
             const [connected, setConnected] = useState(false);
@@ -1043,6 +1226,9 @@
 
                     {/* Indicador de balanza */}
                     <BalanzaIndicator balanzaConfig={balanzaConfig} currentWeight={currentWeight} />
+
+                    {/* Indicador de sincronización Firebase */}
+                    <FirebaseIndicator />
 
                     {/* Header */}
                     <header className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-xl">
@@ -2796,6 +2982,7 @@
                     <div className="bg-white rounded-xl shadow-lg p-4">
                         <div className="flex gap-2 overflow-x-auto">
                             {[
+                                { id: 'firebase', label: 'Sincronización en la Nube', icon: 'Cloud' },
                                 { id: 'dian', label: 'Configuración DIAN', icon: 'Shield' },
                                 { id: 'balanza', label: 'Balanza', icon: 'Scale' },
                                 { id: 'backup', label: 'Respaldo', icon: 'Download' }
@@ -2815,6 +3002,148 @@
                             ))}
                         </div>
                     </div>
+
+                    {/* Configuración de Firebase */}
+                    {activeSection === 'firebase' && (
+                        <div className="bg-white rounded-xl shadow-lg p-6">
+                            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                                <Icon name="Cloud" className="w-7 h-7 text-red-600" />
+                                Sincronización en la Nube con Firebase
+                            </h2>
+
+                            {/* Estado actual */}
+                            <div className={`mb-6 p-6 rounded-xl border-2 ${
+                                firebaseEnabled 
+                                    ? 'bg-green-50 border-green-300' 
+                                    : 'bg-yellow-50 border-yellow-300'
+                            }`}>
+                                <div className="flex items-start gap-4">
+                                    <Icon 
+                                        name={firebaseEnabled ? "CheckCircle" : "AlertCircle"} 
+                                        className={`w-8 h-8 ${firebaseEnabled ? 'text-green-600' : 'text-yellow-600'}`} 
+                                    />
+                                    <div className="flex-1">
+                                        <h3 className={`text-lg font-bold mb-2 ${
+                                            firebaseEnabled ? 'text-green-800' : 'text-yellow-800'
+                                        }`}>
+                                            {firebaseEnabled 
+                                                ? '✅ Sincronización Activa' 
+                                                : '⚠️ Sincronización No Configurada'
+                                            }
+                                        </h3>
+                                        <p className={firebaseEnabled ? 'text-green-700' : 'text-yellow-700'}>
+                                            {firebaseEnabled 
+                                                ? 'Tus datos se están guardando automáticamente en la nube y están disponibles en todos tus dispositivos.' 
+                                                : 'Actualmente solo usas almacenamiento local. Tus datos solo están en este dispositivo.'
+                                            }
+                                        </p>
+                                        {firebaseEnabled && (
+                                            <p className="mt-2 text-sm text-green-600">
+                                                <strong>ID de tu tienda:</strong> {StorageManager.storeId}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Instrucciones */}
+                            <div className="space-y-6">
+                                <div className="bg-blue-50 p-6 rounded-xl border-2 border-blue-200">
+                                    <h3 className="text-lg font-bold mb-4 text-blue-900 flex items-center gap-2">
+                                        <Icon name="Info" className="w-6 h-6" />
+                                        ¿Qué es la Sincronización en la Nube?
+                                    </h3>
+                                    <div className="space-y-3 text-blue-800">
+                                        <p>✅ <strong>Accede desde cualquier dispositivo:</strong> PC, tablet, celular - tus datos siempre disponibles</p>
+                                        <p>✅ <strong>Respaldo automático:</strong> Tus datos están seguros en la nube de Google</p>
+                                        <p>✅ <strong>Trabajo en equipo:</strong> Varios dispositivos sincronizados en tiempo real</p>
+                                        <p>✅ <strong>100% Gratis:</strong> Firebase ofrece uso gratuito generoso para negocios pequeños</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-300">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                        <Icon name="Settings" className="w-6 h-6 text-red-600" />
+                                        Cómo Activar la Sincronización
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">1</div>
+                                            <div>
+                                                <p className="font-semibold">Crear cuenta en Firebase</p>
+                                                <p className="text-sm text-gray-600">Ve a <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 underline">console.firebase.google.com</a> e inicia sesión con tu cuenta de Google</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">2</div>
+                                            <div>
+                                                <p className="font-semibold">Crear nuevo proyecto</p>
+                                                <p className="text-sm text-gray-600">Haz clic en "Agregar proyecto" y ponle un nombre (ej: "mi-carniceria")</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">3</div>
+                                            <div>
+                                                <p className="font-semibold">Activar Firestore Database</p>
+                                                <p className="text-sm text-gray-600">En el menú lateral, ve a "Firestore Database" y actívalo en <strong>modo de prueba</strong></p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">4</div>
+                                            <div>
+                                                <p className="font-semibold">Obtener configuración</p>
+                                                <p className="text-sm text-gray-600">Ve a "Configuración del proyecto" → "Tus apps" → Agrega una aplicación web (icono &lt;/&gt;)</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <div className="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0">5</div>
+                                            <div>
+                                                <p className="font-semibold">Configurar en el código</p>
+                                                <p className="text-sm text-gray-600 mb-2">Copia los valores que te muestra Firebase y pégalos en el código HTML (busca "firebaseConfig" al inicio del archivo)</p>
+                                                <div className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs font-mono overflow-x-auto">
+{`const firebaseConfig = {
+    apiKey: "AIzaSy...",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto-id",
+    storageBucket: "tu-proyecto.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123"
+};`}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-purple-50 p-6 rounded-xl border-2 border-purple-200">
+                                    <h3 className="text-lg font-bold mb-3 text-purple-900 flex items-center gap-2">
+                                        <Icon name="HelpCircle" className="w-6 h-6" />
+                                        ¿Necesitas ayuda?
+                                    </h3>
+                                    <p className="text-purple-800 mb-3">Si necesitas asistencia para configurar Firebase, puedes:</p>
+                                    <ul className="space-y-2 text-purple-700">
+                                        <li>📹 Ver tutoriales en YouTube: "Como configurar Firebase"</li>
+                                        <li>📚 Leer la documentación oficial de Firebase</li>
+                                        <li>💬 Consultar con un desarrollador o técnico</li>
+                                    </ul>
+                                </div>
+
+                                {!firebaseEnabled && (
+                                    <div className="bg-red-50 p-6 rounded-xl border-2 border-red-300">
+                                        <h3 className="text-lg font-bold mb-3 text-red-900 flex items-center gap-2">
+                                            <Icon name="AlertCircle" className="w-6 h-6" />
+                                            Importante
+                                        </h3>
+                                        <p className="text-red-800">
+                                            Sin sincronización en la nube, tus datos solo están en este dispositivo. 
+                                            Si borras el navegador, cambias de dispositivo o reinstalas, <strong>perderás toda la información</strong>. 
+                                            Te recomendamos configurar Firebase o hacer respaldos regulares.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Configuración DIAN */}
                     {activeSection === 'dian' && (
