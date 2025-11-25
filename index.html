@@ -3,494 +3,1148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Carnicería - DIAN Colombia</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>Sistema de Carnicería</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+        .scale-indicator { animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-gray-100">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-96">
+            <h1 class="text-3xl font-bold text-center mb-2 text-red-600">🥩 Carnicería</h1>
+            <h2 class="text-xl text-center mb-6 text-gray-600">Sistema de Ventas</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Usuario</label>
+                    <input type="text" id="loginUser" class="w-full p-2 border rounded" placeholder="admin o vendedor">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Contraseña</label>
+                    <input type="password" id="loginPass" class="w-full p-2 border rounded" placeholder="Contraseña">
+                </div>
+                <button onclick="login()" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">
+                    Ingresar
+                </button>
+                <div class="text-xs text-gray-500 mt-4 p-3 bg-gray-50 rounded">
+                    <p><strong>Admin:</strong> usuario: admin / contraseña: admin123</p>
+                    <p><strong>Vendedor:</strong> usuario: vendedor / contraseña: vendedor123</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="bg-red-600 text-white p-4 shadow-lg">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-2xl font-bold">🥩 Sistema Carnicería</h1>
+                <div class="flex items-center gap-4">
+                    <span id="userDisplay" class="font-medium"></span>
+                    <button onclick="logout()" class="bg-red-700 px-4 py-2 rounded hover:bg-red-800">
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        </header>
 
-        // URL de Google Apps Script - REEMPLAZAR CON TU URL
-        const API_URL = 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI';
+        <!-- Navigation Tabs -->
+        <div class="bg-white shadow">
+            <div class="container mx-auto">
+                <div class="flex">
+                    <button onclick="showTab('sales')" id="tabSales" class="px-6 py-3 font-medium border-b-2 border-red-600">
+                        Ventas
+                    </button>
+                    <button onclick="showTab('admin')" id="tabAdmin" class="px-6 py-3 font-medium text-gray-500 hidden">
+                        Administración
+                    </button>
+                </div>
+            </div>
+        </div>
 
-        // Componente de Iconos SVG
-        const Icon = ({ name, className = "w-6 h-6" }) => {
-            const icons = {
-                Scale: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>,
-                Barcode: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-                ShoppingCart: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
-                Package: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
-                Settings: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-                LogOut: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
-                Trash2: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-                Edit: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-                Plus: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-                Save: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
-                X: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-                Receipt: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-                Wifi: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
-                WifiOff: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" /></svg>,
-                UserPlus: <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>,
-            };
-            return icons[name] || null;
-        };
+        <!-- Sales Section -->
+        <div id="salesSection" class="container mx-auto p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Products List -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold mb-4">Productos Disponibles</h2>
+                        <div id="productsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Products will be loaded here -->
+                        </div>
+                    </div>
+                </div>
 
-        // Funciones de LocalStorage para persistencia
-        const saveToLocalStorage = (key, data) => {
-            try {
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (e) {
-                console.error('Error guardando en localStorage:', e);
-            }
-        };
-
-        const loadFromLocalStorage = (key, defaultValue) => {
-            try {
-                const item = localStorage.getItem(key);
-                return item ? JSON.parse(item) : defaultValue;
-            } catch (e) {
-                console.error('Error cargando de localStorage:', e);
-                return defaultValue;
-            }
-        };
-
-        // Componente Principal
-        function App() {
-            const [user, setUser] = useState(() => loadFromLocalStorage('user', null));
-            const [products, setProducts] = useState(() => loadFromLocalStorage('products', [
-                {id: '1', barcode: '7501234567890', name: 'Carne de Res', category: 'Res', pricePerKg: 35000, stockKg: 50},
-                {id: '2', barcode: '7501234567891', name: 'Carne de Cerdo', category: 'Cerdo', pricePerKg: 28000, stockKg: 30},
-                {id: '3', barcode: '7501234567892', name: 'Pollo Entero', category: 'Pollo', pricePerKg: 12000, stockKg: 40},
-                {id: '4', barcode: '7501234567893', name: 'Chorizo', category: 'Embutidos', pricePerKg: 18000, stockKg: 25}
-            ]));
-            const [cart, setCart] = useState([]);
-            const [currentWeight, setCurrentWeight] = useState('');
-            const [barcodeInput, setBarcodeInput] = useState('');
-            const [config, setConfig] = useState(() => loadFromLocalStorage('config', {
-                'Nombre Negocio': 'Carnicería San José',
-                'NIT': '900123456-7',
-                'Razón Social': 'Carnicería San José S.A.S',
-                'Prefijo Factura': 'SETT',
-                'Consecutivo Actual': '1',
-                'Ciudad': 'Bogotá D.C.',
-                'Departamento': 'Cundinamarca',
-                'Dirección': 'Calle 123 #45-67',
-                'Teléfono': '601-1234567',
-                'Email': 'facturacion@carniceria.com'
-            }));
-            const [loginUsername, setLoginUsername] = useState('');
-            const [loginPassword, setLoginPassword] = useState('');
-            const [selectedProduct, setSelectedProduct] = useState(null);
-            const [clientes, setClientes] = useState(() => loadFromLocalStorage('clientes', [
-                {id: '1', nombre: 'Consumidor Final', tipoDoc: 'NIT', numeroDoc: '222222222222', email: '', telefono: '', direccion: '', ciudad: 'Bogotá', departamento: 'Cundinamarca'},
-                {id: '2', nombre: 'Juan Pérez', tipoDoc: 'CC', numeroDoc: '1234567890', email: 'juan@email.com', telefono: '3001234567', direccion: 'Calle 10 #20-30', ciudad: 'Bogotá', departamento: 'Cundinamarca'}
-            ]));
-            const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-            const [saleForInvoice, setSaleForInvoice] = useState(null);
-            const [scaleConnected, setScaleConnected] = useState(false);
-            const [scaleWeight, setScaleWeight] = useState(0);
-            const [apiUrl, setApiUrl] = useState(() => loadFromLocalStorage('apiUrl', API_URL));
-            const scalePortRef = useRef(null);
-
-            // Guardar en localStorage cuando cambien los datos
-            useEffect(() => {
-                saveToLocalStorage('user', user);
-            }, [user]);
-
-            useEffect(() => {
-                saveToLocalStorage('products', products);
-            }, [products]);
-
-            useEffect(() => {
-                saveToLocalStorage('config', config);
-            }, [config]);
-
-            useEffect(() => {
-                saveToLocalStorage('clientes', clientes);
-            }, [clientes]);
-
-            useEffect(() => {
-                saveToLocalStorage('apiUrl', apiUrl);
-            }, [apiUrl]);
-
-            // Funciones de API
-            const callAPI = async (action, data = {}) => {
-                if (apiUrl === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                    console.log('Modo DEMO - Sin conexión a Google Sheets');
-                    return { success: false, message: 'Configura la URL de Google Apps Script' };
-                }
-
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action, ...data })
-                    });
-                    return await response.json();
-                } catch (error) {
-                    console.error('Error en API:', error);
-                    return { success: false, message: 'Error de conexión' };
-                }
-            };
-
-            // Funciones de Báscula
-            const connectScale = async () => {
-                if ('serial' in navigator) {
-                    try {
-                        const port = await navigator.serial.requestPort();
-                        await port.open({ baudRate: 9600 });
-                        scalePortRef.current = port;
-                        setScaleConnected(true);
-                        readScaleData(port);
-                        alert('✅ Báscula conectada correctamente');
-                    } catch (error) {
-                        alert('Error al conectar báscula: ' + error.message);
-                    }
-                } else {
-                    alert('⚠️ Tu navegador no soporta Web Serial API. Usa Chrome o Edge.');
-                }
-            };
-
-            const readScaleData = async (port) => {
-                const reader = port.readable.getReader();
-                try {
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        
-                        const text = new TextDecoder().decode(value);
-                        const weight = parseWeight(text);
-                        if (weight !== null) {
-                            setScaleWeight(weight);
-                            setCurrentWeight(weight.toFixed(2));
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error leyendo báscula:', error);
-                } finally {
-                    reader.releaseLock();
-                }
-            };
-
-            const parseWeight = (data) => {
-                const match = data.match(/(\d+\.?\d*)/);
-                return match ? parseFloat(match[0]) : null;
-            };
-
-            const disconnectScale = async () => {
-                if (scalePortRef.current) {
-                    try {
-                        await scalePortRef.current.close();
-                        scalePortRef.current = null;
-                        setScaleConnected(false);
-                        setScaleWeight(0);
-                        alert('Báscula desconectada');
-                    } catch (error) {
-                        console.error('Error desconectando báscula:', error);
-                    }
-                }
-            };
-
-            // Cargar productos desde Google Sheets
-            const loadProductsFromAPI = async () => {
-                const result = await callAPI('getProducts');
-                if (result.success) {
-                    setProducts(result.data);
-                    alert('✅ Productos cargados desde Google Sheets');
-                }
-            };
-
-            // Cargar clientes desde Google Sheets
-            const loadClientesFromAPI = async () => {
-                const result = await callAPI('getClientes');
-                if (result.success) {
-                    setClientes(result.data);
-                    alert('✅ Clientes cargados desde Google Sheets');
-                }
-            };
-
-            // Cargar configuración desde Google Sheets
-            const loadConfigFromAPI = async () => {
-                const result = await callAPI('getConfig');
-                if (result.success) {
-                    setConfig(result.data);
-                    alert('✅ Configuración cargada desde Google Sheets');
-                }
-            };
-
-            const handleLogin = async () => {
-                // Primero intentar con API si está configurada
-                if (apiUrl !== 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                    const result = await callAPI('login', { username: loginUsername, password: loginPassword });
-                    if (result.success) {
-                        setUser(result.data);
-                        await loadProductsFromAPI();
-                        await loadClientesFromAPI();
-                        await loadConfigFromAPI();
-                        return;
-                    }
-                }
-
-                // Login local (modo demo)
-                if (loginUsername === 'admin' && loginPassword === 'admin123') {
-                    setUser({ nombre: 'Administrador', rol: 'ADMIN' });
-                } else if (loginUsername === 'vendedor' && loginPassword === 'vend123') {
-                    setUser({ nombre: 'Vendedor 1', rol: 'VENDEDOR' });
-                } else {
-                    alert('Usuario o contraseña incorrectos');
-                }
-            };
-
-            const addToCart = (product, weight) => {
-                const subtotal = weight * product.pricePerKg;
-                setCart([...cart, { ...product, weight, subtotal }]);
-            };
-
-            const handleBarcodeSubmit = () => {
-                const product = products.find(p => p.barcode === barcodeInput);
-                if (product && currentWeight && parseFloat(currentWeight) > 0) {
-                    addToCart(product, parseFloat(currentWeight));
-                    setCurrentWeight('');
-                    setBarcodeInput('');
-                } else {
-                    alert('Producto no encontrado o peso inválido');
-                }
-            };
-
-            const addSelectedProductToCart = () => {
-                if (selectedProduct && currentWeight && parseFloat(currentWeight) > 0) {
-                    addToCart(selectedProduct, parseFloat(currentWeight));
-                    setCurrentWeight('');
-                    setSelectedProduct(null);
-                } else {
-                    alert('Selecciona un producto e ingresa el peso');
-                }
-            };
-
-            const completeSale = async () => {
-                if (cart.length === 0) {
-                    alert('El carrito está vacío');
-                    return;
-                }
-                
-                const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
-                const saleId = 'V' + Date.now();
-                const sale = { 
-                    saleId, 
-                    seller: user.nombre, 
-                    items: cart, 
-                    total,
-                    date: new Date()
-                };
-
-                // Intentar guardar en Google Sheets
-                if (apiUrl !== 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                    const result = await callAPI('saveSale', { sale });
-                    if (result.success) {
-                        console.log('Venta guardada en Google Sheets');
-                    }
-                }
-
-                setSaleForInvoice(sale);
-                setShowInvoiceModal(true);
-            };
-
-            // Vista de Login
-            if (!user) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-                            <div className="text-center mb-8">
-                                <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Icon name="Scale" className="w-10 h-10 text-red-600" />
+                <!-- Cart and Weight -->
+                <div>
+                    <!-- Weight Scale -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h3 class="text-lg font-bold mb-4">⚖️ Balanza</h3>
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-gray-600">Modo:</span>
+                                <div class="flex gap-2">
+                                    <button onclick="setWeightMode('auto')" id="autoMode" class="px-3 py-1 text-sm rounded bg-red-600 text-white">
+                                        Automático
+                                    </button>
+                                    <button onclick="setWeightMode('manual')" id="manualMode" class="px-3 py-1 text-sm rounded bg-gray-200">
+                                        Manual
+                                    </button>
                                 </div>
-                                <h1 className="text-3xl font-bold text-gray-800">Sistema Carnicería</h1>
-                                <p className="text-gray-600 mt-2">DIAN Colombia</p>
                             </div>
-                            
-                            <div className="space-y-4">
-                                <input
-                                    type="text"
-                                    value={loginUsername}
-                                    onChange={(e) => setLoginUsername(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                                    className="w-full px-4 py-3 border rounded-lg"
-                                    placeholder="Usuario"
-                                />
-                                <input
-                                    type="password"
-                                    value={loginPassword}
-                                    onChange={(e) => setLoginPassword(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-                                    className="w-full px-4 py-3 border rounded-lg"
-                                    placeholder="Contraseña"
-                                />
-                                <button onClick={handleLogin} className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700">
-                                    Iniciar Sesión
+                            <div id="autoWeightSection">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="scale-indicator text-green-500 text-2xl">●</span>
+                                    <span class="text-sm">Conectado</span>
+                                </div>
+                                <div class="text-4xl font-bold text-center p-4 bg-gray-50 rounded">
+                                    <span id="autoWeight">0.00</span> kg
+                                </div>
+                            </div>
+                            <div id="manualWeightSection" class="hidden">
+                                <input type="number" id="manualWeight" step="0.01" min="0" 
+                                       class="w-full p-3 text-2xl text-center border rounded" 
+                                       placeholder="0.00">
+                                <span class="block text-center text-sm text-gray-600 mt-1">kg</span>
+                            </div>
+                        </div>
+                        <div id="selectedProduct" class="mb-4 p-3 bg-blue-50 rounded hidden">
+                            <p class="font-medium">Producto seleccionado:</p>
+                            <p id="selectedProductName" class="text-lg"></p>
+                        </div>
+                        <button onclick="addToCart()" class="w-full bg-green-600 text-white p-3 rounded hover:bg-green-700 font-bold">
+                            Agregar al Carrito
+                        </button>
+                    </div>
+
+                    <!-- Cart -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-bold mb-4">🛒 Carrito</h3>
+                        <div id="cartItems" class="space-y-2 mb-4 max-h-64 overflow-y-auto">
+                            <p class="text-gray-500 text-center py-8">Carrito vacío</p>
+                        </div>
+                        <div class="border-t pt-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-xl font-bold">Total:</span>
+                                <span id="cartTotal" class="text-2xl font-bold text-red-600">$0.00</span>
+                            </div>
+                            <div class="space-y-2">
+                                <button onclick="processCheckout()" class="w-full bg-red-600 text-white p-3 rounded hover:bg-red-700 font-bold">
+                                    Procesar Venta
+                                </button>
+                                <button onclick="clearCart()" class="w-full bg-gray-300 text-gray-700 p-2 rounded hover:bg-gray-400">
+                                    Limpiar Carrito
                                 </button>
                             </div>
-                            
-                            <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm">
-                                <p className="font-bold mb-2">Usuarios de prueba:</p>
-                                <p>👨‍💼 Admin: <b>admin</b> / <b>admin123</b></p>
-                                <p>👤 Vendedor: <b>vendedor</b> / <b>vend123</b></p>
-                            </div>
                         </div>
                     </div>
-                );
-            }
+                </div>
+            </div>
+        </div>
 
-            // Vista de Administrador
-            if (user.rol === 'ADMIN') {
-                return <AdminPanel 
-                    products={products} 
-                    setProducts={setProducts} 
-                    config={config} 
-                    setConfig={setConfig}
-                    user={user} 
-                    setUser={setUser}
-                    apiUrl={apiUrl}
-                    setApiUrl={setApiUrl}
-                    callAPI={callAPI}
-                    loadProductsFromAPI={loadProductsFromAPI}
-                    loadConfigFromAPI={loadConfigFromAPI}
-                />;
-            }
+        <!-- Admin Section -->
+        <div id="adminSection" class="container mx-auto p-6 hidden">
+            <!-- Admin Tabs -->
+            <div class="mb-6 flex gap-2">
+                <button onclick="showAdminTab('products')" id="adminTabProducts" class="px-4 py-2 bg-red-600 text-white rounded">
+                    📦 Productos
+                </button>
+                <button onclick="showAdminTab('scale')" id="adminTabScale" class="px-4 py-2 bg-gray-300 rounded">
+                    ⚖️ Balanza
+                </button>
+                <button onclick="showAdminTab('sales')" id="adminTabSales" class="px-4 py-2 bg-gray-300 rounded">
+                    📊 Ventas
+                </button>
+            </div>
 
-            // Vista de Ventas
-            return <SalesPanel 
-                user={user} 
-                setUser={setUser}
-                products={products} 
-                cart={cart} 
-                setCart={setCart}
-                currentWeight={currentWeight}
-                setCurrentWeight={setCurrentWeight}
-                barcodeInput={barcodeInput}
-                setBarcodeInput={setBarcodeInput}
-                selectedProduct={selectedProduct}
-                setSelectedProduct={setSelectedProduct}
-                handleBarcodeSubmit={handleBarcodeSubmit}
-                addSelectedProductToCart={addSelectedProductToCart}
-                completeSale={completeSale}
-                showInvoiceModal={showInvoiceModal}
-                setShowInvoiceModal={setShowInvoiceModal}
-                saleForInvoice={saleForInvoice}
-                clientes={clientes}
-                setClientes={setClientes}
-                config={config}
-                scaleConnected={scaleConnected}
-                scaleWeight={scaleWeight}
-                connectScale={connectScale}
-                disconnectScale={disconnectScale}
-            />;
+            <!-- Products Management -->
+            <div id="adminProductsSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Product Management -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">📦 Gestión de Productos</h2>
+                    <form onsubmit="addProduct(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Nombre del Producto</label>
+                            <input type="text" id="productName" required class="w-full p-2 border rounded" placeholder="Ej: Carne de Res">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Precio por Kg ($)</label>
+                            <input type="number" id="productPrice" step="0.01" min="0" required class="w-full p-2 border rounded" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Categoría</label>
+                            <select id="productCategory" class="w-full p-2 border rounded">
+                                <option value="Res">Res</option>
+                                <option value="Cerdo">Cerdo</option>
+                                <option value="Pollo">Pollo</option>
+                                <option value="Cordero">Cordero</option>
+                                <option value="Otros">Otros</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">
+                            Agregar Producto
+                        </button>
+                    </form>
+
+                    <!-- Products List for Admin -->
+                    <div class="mt-6">
+                        <h3 class="font-bold mb-3">Productos Registrados</h3>
+                        <div id="adminProductsList" class="space-y-2 max-h-96 overflow-y-auto">
+                            <!-- Products will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">📈 Estadísticas Rápidas</h2>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-blue-50 rounded">
+                            <p class="text-sm text-gray-600">Total Productos</p>
+                            <p id="statsProducts" class="text-3xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded">
+                            <p class="text-sm text-gray-600">Ventas Hoy</p>
+                            <p id="statsSalesToday" class="text-3xl font-bold text-green-600">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-purple-50 rounded">
+                            <p class="text-sm text-gray-600">Ventas Totales</p>
+                            <p id="statsSalesTotal" class="text-3xl font-bold text-purple-600">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-orange-50 rounded">
+                            <p class="text-sm text-gray-600">Total Transacciones</p>
+                            <p id="statsTransactions" class="text-3xl font-bold text-orange-600">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scale Configuration -->
+            <div id="adminScaleSection" class="hidden">
+                <div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+                    <h2 class="text-xl font-bold mb-4">⚙️ Configuración de Balanza</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Puerto Serial</label>
+                            <input type="text" id="scalePort" class="w-full p-2 border rounded" placeholder="COM3 o /dev/ttyUSB0">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Velocidad (Baud Rate)</label>
+                            <select id="scaleBaud" class="w-full p-2 border rounded">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200">115200</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Protocolo</label>
+                            <select id="scaleProtocol" class="w-full p-2 border rounded">
+                                <option value="standard">Estándar</option>
+                                <option value="toledo">Toledo</option>
+                                <option value="mettler">Mettler Toledo</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Tiempo de estabilización (ms)</label>
+                            <input type="number" id="scaleStabilization" class="w-full p-2 border rounded" value="1000">
+                        </div>
+                        <button onclick="saveScaleConfig()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
+                            Guardar Configuración
+                        </button>
+                        <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                            <p class="font-medium">⚠️ Nota:</p>
+                            <p>Para conexión real con balanza serial, este sistema debe ejecutarse en un servidor local con acceso a puertos COM.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales History -->
+            <div id="adminSalesSection" class="hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">📊 Historial de Ventas</h2>
+                        <div class="flex gap-2">
+                            <button onclick="exportSales()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                📥 Exportar CSV
+                            </button>
+                            <button onclick="printSalesReport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                                🖨️ Imprimir Reporte
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Fecha Desde</label>
+                            <input type="date" id="filterDateFrom" class="w-full p-2 border rounded">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Fecha Hasta</label>
+                            <input type="date" id="filterDateTo" class="w-full p-2 border rounded">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Usuario</label>
+                            <select id="filterUser" class="w-full p-2 border rounded">
+                                <option value="">Todos</option>
+                                <option value="Administrador">Administrador</option>
+                                <option value="Vendedor">Vendedor</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="filterSales()" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">
+                                Filtrar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sales Summary -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="p-4 bg-blue-50 rounded">
+                            <p class="text-sm text-gray-600">Total Ventas Filtradas</p>
+                            <p id="filteredTotal" class="text-2xl font-bold text-blue-600">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded">
+                            <p class="text-sm text-gray-600">Número de Transacciones</p>
+                            <p id="filteredCount" class="text-2xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="p-4 bg-purple-50 rounded">
+                            <p class="text-sm text-gray-600">Ticket Promedio</p>
+                            <p id="filteredAverage" class="text-2xl font-bold text-purple-600">$0.00</p>
+                        </div>
+                    </div>
+
+                    <!-- Sales Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full" id="salesTable">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="text-left p-3">Factura #</th>
+                                    <th class="text-left p-3">Fecha</th>
+                                    <th class="text-left p-3">Usuario</th>
+                                    <th class="text-left p-3">Productos</th>
+                                    <th class="text-right p-3">Total</th>
+                                    <th class="text-center p-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesTableBody">
+                                <!-- Sales will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Modal -->
+    <div id="invoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
+            <div class="print-area">
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-bold text-red-600">🥩 CARNICERÍA</h1>
+                    <p class="text-gray-600">Sistema de Ventas</p>
+                    <p class="text-sm text-gray-500">Tel: (123) 456-7890</p>
+                </div>
+                
+                <div class="border-t border-b py-4 mb-4">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-medium">Factura #:</span>
+                        <span id="invoiceNumber"></span>
+                    </div>
+                    <div class="flex justify-between mb-2">
+                        <span class="font-medium">Fecha:</span>
+                        <span id="invoiceDate"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">Atendido por:</span>
+                        <span id="invoiceUser"></span>
+                    </div>
+                </div>
+
+                <table class="w-full mb-4">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left py-2">Producto</th>
+                            <th class="text-right py-2">Peso (kg)</th>
+                            <th class="text-right py-2">Precio/kg</th>
+                            <th class="text-right py-2">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoiceItems">
+                        <!-- Items will be added here -->
+                    </tbody>
+                </table>
+
+                <div class="border-t pt-4">
+                    <div class="flex justify-between text-2xl font-bold">
+                        <span>TOTAL:</span>
+                        <span id="invoiceTotal" class="text-red-600"></span>
+                    </div>
+                </div>
+
+                <div class="text-center mt-6 text-sm text-gray-500">
+                    <p>¡Gracias por su compra!</p>
+                    <p>Vuelva pronto</p>
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-6 no-print">
+                <button onclick="printInvoice()" class="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-700">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="closeInvoice()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded hover:bg-gray-400">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Report Print Modal -->
+    <div id="salesReportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="print-area">
+                <div class="text-center mb-6">
+                    <h1 class="text-3xl font-bold text-red-600">🥩 CARNICERÍA</h1>
+                    <h2 class="text-xl text-gray-700 mt-2">Reporte de Ventas</h2>
+                </div>
+                
+                <div class="border-t border-b py-4 mb-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="font-medium">Fecha del Reporte:</span>
+                            <span id="reportDate"></span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Período:</span>
+                            <span id="reportPeriod"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="text-center p-4 bg-blue-50 rounded">
+                        <p class="text-sm text-gray-600">Total Ventas</p>
+                        <p id="reportTotalSales" class="text-2xl font-bold text-blue-600">$0.00</p>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded">
+                        <p class="text-sm text-gray-600">Transacciones</p>
+                        <p id="reportTransactions" class="text-2xl font-bold text-green-600">0</p>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded">
+                        <p class="text-sm text-gray-600">Ticket Promedio</p>
+                        <p id="reportAverage" class="text-2xl font-bold text-purple-600">$0.00</p>
+                    </div>
+                </div>
+
+                <table class="w-full mb-4">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="text-left p-2">Factura #</th>
+                            <th class="text-left p-2">Fecha</th>
+                            <th class="text-left p-2">Usuario</th>
+                            <th class="text-left p-2">Productos</th>
+                            <th class="text-right p-2">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody">
+                        <!-- Sales will be added here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex gap-4 mt-6 no-print">
+                <button onclick="window.print()" class="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-700">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="closeSalesReport()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded hover:bg-gray-400">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        let currentUser = null;
+        let userRole = null;
+        let products = [];
+        let cart = [];
+        let scaleConfig = {};
+        let weightMode = 'auto';
+        let selectedProductForWeight = null;
+        let autoWeightInterval = null;
+        let invoiceCounter = 1;
+        let salesHistory = [];
+        let filteredSales = [];
+
+        // Initialize App
+        function initApp() {
+            loadData();
+            if (products.length === 0) {
+                loadDefaultProducts();
+            }
+            startAutoWeightSimulation();
+            setTodayDates();
         }
 
-        // Panel de Administrador
-        function AdminPanel({ products, setProducts, config, setConfig, user, setUser, apiUrl, setApiUrl, callAPI, loadProductsFromAPI, loadConfigFromAPI }) {
-            const [activeTab, setActiveTab] = useState('products');
-            const [editingProduct, setEditingProduct] = useState(null);
-            const [newProduct, setNewProduct] = useState({barcode: '', name: '', category: '', pricePerKg: '', stockKg: ''});
-            const [tempApiUrl, setTempApiUrl] = useState(apiUrl);
+        // Set today's date in filters
+        function setTodayDates() {
+            const today = new Date().toISOString().split('T')[0];
+            const dateFrom = document.getElementById('filterDateFrom');
+            const dateTo = document.getElementById('filterDateTo');
+            if (dateFrom) dateFrom.value = today;
+            if (dateTo) dateTo.value = today;
+        }
 
-            const handleSaveProduct = async () => {
-                if (editingProduct) {
-                    setProducts(products.map(p => p.id === editingProduct.id ? editingProduct : p));
-                    
-                    // Guardar en Google Sheets si está configurado
-                    if (apiUrl !== 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                        await callAPI('updateProduct', { product: editingProduct });
-                    }
-                    
-                    alert('✅ Producto actualizado');
-                    setEditingProduct(null);
-                } else {
-                    if (!newProduct.barcode || !newProduct.name) {
-                        alert('⚠️ Completa todos los campos obligatorios');
-                        return;
-                    }
-                    
-                    const productToAdd = { ...newProduct, id: Date.now().toString() };
-                    setProducts([...products, productToAdd]);
-                    
-                    // Guardar en Google Sheets si está configurado
-                    if (apiUrl !== 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                        await callAPI('addProduct', { product: productToAdd });
-                    }
-                    
-                    alert('✅ Producto agregado');
-                    setNewProduct({barcode: '', name: '', category: '', pricePerKg: '', stockKg: ''});
+        // Load data from localStorage
+        function loadData() {
+            const savedProducts = localStorage.getItem('carniceria_products');
+            const savedScaleConfig = localStorage.getItem('carniceria_scaleConfig');
+            const savedInvoiceCounter = localStorage.getItem('carniceria_invoiceCounter');
+            const savedSalesHistory = localStorage.getItem('carniceria_salesHistory');
+            
+            if (savedProducts) products = JSON.parse(savedProducts);
+            if (savedScaleConfig) {
+                scaleConfig = JSON.parse(savedScaleConfig);
+                loadScaleConfigToForm();
+            }
+            if (savedInvoiceCounter) invoiceCounter = parseInt(savedInvoiceCounter);
+            if (savedSalesHistory) salesHistory = JSON.parse(savedSalesHistory);
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('carniceria_products', JSON.stringify(products));
+            localStorage.setItem('carniceria_scaleConfig', JSON.stringify(scaleConfig));
+            localStorage.setItem('carniceria_invoiceCounter', invoiceCounter.toString());
+            localStorage.setItem('carniceria_salesHistory', JSON.stringify(salesHistory));
+        }
+
+        // Load default products
+        function loadDefaultProducts() {
+            products = [
+                { id: 1, name: 'Carne de Res - Lomo', price: 25.00, category: 'Res' },
+                { id: 2, name: 'Carne de Res - Molida', price: 15.00, category: 'Res' },
+                { id: 3, name: 'Carne de Cerdo - Chuleta', price: 18.00, category: 'Cerdo' },
+                { id: 4, name: 'Pollo - Pechuga', price: 12.00, category: 'Pollo' },
+                { id: 5, name: 'Costillas de Cerdo', price: 20.00, category: 'Cerdo' },
+            ];
+            saveData();
+        }
+
+        // Login
+        function login() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+
+            if (user === 'admin' && pass === 'admin123') {
+                currentUser = 'Administrador';
+                userRole = 'admin';
+                showMainApp();
+            } else if (user === 'vendedor' && pass === 'vendedor123') {
+                currentUser = 'Vendedor';
+                userRole = 'vendedor';
+                showMainApp();
+            } else {
+                alert('Usuario o contraseña incorrectos');
+            }
+        }
+
+        // Show main app
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('userDisplay').textContent = currentUser;
+
+            if (userRole === 'admin') {
+                document.getElementById('tabAdmin').classList.remove('hidden');
+            }
+
+            loadProductsToSales();
+            loadProductsToAdmin();
+            updateStats();
+        }
+
+        // Logout
+        function logout() {
+            currentUser = null;
+            userRole = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPass').value = '';
+        }
+
+        // Show tab
+        function showTab(tab) {
+            if (tab === 'sales') {
+                document.getElementById('salesSection').classList.remove('hidden');
+                document.getElementById('adminSection').classList.add('hidden');
+                document.getElementById('tabSales').classList.add('border-red-600', 'text-black');
+                document.getElementById('tabSales').classList.remove('text-gray-500');
+                if (document.getElementById('tabAdmin')) {
+                    document.getElementById('tabAdmin').classList.remove('border-red-600', 'text-black');
+                    document.getElementById('tabAdmin').classList.add('text-gray-500');
                 }
-            };
+            } else {
+                document.getElementById('salesSection').classList.add('hidden');
+                document.getElementById('adminSection').classList.remove('hidden');
+                document.getElementById('tabAdmin').classList.add('border-red-600', 'text-black');
+                document.getElementById('tabAdmin').classList.remove('text-gray-500');
+                document.getElementById('tabSales').classList.remove('border-red-600', 'text-black');
+                document.getElementById('tabSales').classList.add('text-gray-500');
+                
+                // Load sales when switching to admin
+                showAdminTab('products');
+            }
+        }
 
-            const handleDeleteProduct = (id) => {
-                if (window.confirm('¿Eliminar este producto?')) {
-                    setProducts(products.filter(p => p.id !== id));
-                    
-                    // Eliminar en Google Sheets si está configurado
-                    if (apiUrl !== 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                        callAPI('deleteProduct', { id });
-                    }
-                    
-                    alert('✅ Producto eliminado');
+        // Show admin tab
+        function showAdminTab(tab) {
+            // Hide all sections
+            document.getElementById('adminProductsSection').classList.add('hidden');
+            document.getElementById('adminScaleSection').classList.add('hidden');
+            document.getElementById('adminSalesSection').classList.add('hidden');
+
+            // Reset all tab buttons
+            document.getElementById('adminTabProducts').classList.remove('bg-red-600', 'text-white');
+            document.getElementById('adminTabProducts').classList.add('bg-gray-300');
+            document.getElementById('adminTabScale').classList.remove('bg-red-600', 'text-white');
+            document.getElementById('adminTabScale').classList.add('bg-gray-300');
+            document.getElementById('adminTabSales').classList.remove('bg-red-600', 'text-white');
+            document.getElementById('adminTabSales').classList.add('bg-gray-300');
+
+            // Show selected section and highlight tab
+            if (tab === 'products') {
+                document.getElementById('adminProductsSection').classList.remove('hidden');
+                document.getElementById('adminTabProducts').classList.add('bg-red-600', 'text-white');
+                document.getElementById('adminTabProducts').classList.remove('bg-gray-300');
+                updateStats();
+            } else if (tab === 'scale') {
+                document.getElementById('adminScaleSection').classList.remove('hidden');
+                document.getElementById('adminTabScale').classList.add('bg-red-600', 'text-white');
+                document.getElementById('adminTabScale').classList.remove('bg-gray-300');
+            } else if (tab === 'sales') {
+                document.getElementById('adminSalesSection').classList.remove('hidden');
+                document.getElementById('adminTabSales').classList.add('bg-red-600', 'text-white');
+                document.getElementById('adminTabSales').classList.remove('bg-gray-300');
+                loadSalesHistory();
+                filterSales();
+            }
+        }
+
+        // Update statistics
+        function updateStats() {
+            const statsProducts = document.getElementById('statsProducts');
+            const statsSalesToday = document.getElementById('statsSalesToday');
+            const statsSalesTotal = document.getElementById('statsSalesTotal');
+            const statsTransactions = document.getElementById('statsTransactions');
+
+            if (!statsProducts) return;
+
+            // Total products
+            statsProducts.textContent = products.length;
+
+            // Today's sales
+            const today = new Date().toDateString();
+            const todaySales = salesHistory.filter(sale => 
+                new Date(sale.date).toDateString() === today
+            );
+            const todayTotal = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+            statsSalesToday.textContent = '$' + todayTotal.toFixed(2);
+
+            // Total sales
+            const totalSales = salesHistory.reduce((sum, sale) => sum + sale.total, 0);
+            statsSalesTotal.textContent = '$' + totalSales.toFixed(2);
+
+            // Total transactions
+            statsTransactions.textContent = salesHistory.length;
+        }
+
+        // Weight mode
+        function setWeightMode(mode) {
+            weightMode = mode;
+            if (mode === 'auto') {
+                document.getElementById('autoMode').classList.add('bg-red-600', 'text-white');
+                document.getElementById('autoMode').classList.remove('bg-gray-200');
+                document.getElementById('manualMode').classList.remove('bg-red-600', 'text-white');
+                document.getElementById('manualMode').classList.add('bg-gray-200');
+                document.getElementById('autoWeightSection').classList.remove('hidden');
+                document.getElementById('manualWeightSection').classList.add('hidden');
+            } else {
+                document.getElementById('manualMode').classList.add('bg-red-600', 'text-white');
+                document.getElementById('manualMode').classList.remove('bg-gray-200');
+                document.getElementById('autoMode').classList.remove('bg-red-600', 'text-white');
+                document.getElementById('autoMode').classList.add('bg-gray-200');
+                document.getElementById('autoWeightSection').classList.add('hidden');
+                document.getElementById('manualWeightSection').classList.remove('hidden');
+            }
+        }
+
+        // Auto weight simulation
+        function startAutoWeightSimulation() {
+            autoWeightInterval = setInterval(() => {
+                if (weightMode === 'auto') {
+                    const weight = (Math.random() * 3 + 0.1).toFixed(2);
+                    document.getElementById('autoWeight').textContent = weight;
                 }
-            };
+            }, 1500);
+        }
 
-            const saveApiUrl = () => {
-                setApiUrl(tempApiUrl);
-                alert('✅ URL de Google Apps Script guardada');
-            };
+        // Load products to sales
+        function loadProductsToSales() {
+            const container = document.getElementById('productsList');
+            container.innerHTML = '';
 
-            const testConnection = async () => {
-                if (tempApiUrl === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                    alert('⚠️ Primero configura una URL válida');
+            products.forEach(product => {
+                const div = document.createElement('div');
+                div.className = 'border rounded-lg p-4 hover:shadow-lg cursor-pointer transition';
+                div.onclick = () => selectProduct(product);
+                div.innerHTML = `
+                    <h3 class="font-bold text-lg mb-1">${product.name}</h3>
+                    <p class="text-sm text-gray-600 mb-2">${product.category}</p>
+                    <p class="text-xl font-bold text-red-600">$${product.price.toFixed(2)}/kg</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Select product for weighing
+        function selectProduct(product) {
+            selectedProductForWeight = product;
+            document.getElementById('selectedProduct').classList.remove('hidden');
+            document.getElementById('selectedProductName').textContent = product.name;
+        }
+
+        // Add to cart
+        function addToCart() {
+            if (!selectedProductForWeight) {
+                alert('Por favor selecciona un producto primero');
+                return;
+            }
+
+            let weight;
+            if (weightMode === 'auto') {
+                weight = parseFloat(document.getElementById('autoWeight').textContent);
+            } else {
+                weight = parseFloat(document.getElementById('manualWeight').value);
+                if (!weight || weight <= 0) {
+                    alert('Por favor ingresa un peso válido');
                     return;
                 }
+            }
 
-                alert('🔄 Probando conexión...');
-                
-                try {
-                    const response = await fetch(tempApiUrl);
-                    const data = await response.json();
-                    
-                    if (data.success || data.message) {
-                        alert('✅ Conexión exitosa con Google Sheets');
-                        await loadProductsFromAPI();
-                        await loadConfigFromAPI();
-                    } else {
-                        alert('❌ La API respondió pero hay un error');
-                    }
-                } catch (error) {
-                    alert('❌ Error de conexión: ' + error.message);
-                }
+            const subtotal = weight * selectedProductForWeight.price;
+            cart.push({
+                product: selectedProductForWeight,
+                weight: weight,
+                subtotal: subtotal
+            });
+
+            updateCart();
+            document.getElementById('manualWeight').value = '';
+            selectedProductForWeight = null;
+            document.getElementById('selectedProduct').classList.add('hidden');
+        }
+
+        // Update cart display
+        function updateCart() {
+            const container = document.getElementById('cartItems');
+            const totalEl = document.getElementById('cartTotal');
+
+            if (cart.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">Carrito vacío</p>';
+                totalEl.textContent = '$0.00';
+                return;
+            }
+
+            container.innerHTML = '';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                total += item.subtotal;
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-start p-3 bg-gray-50 rounded';
+                div.innerHTML = `
+                    <div class="flex-1">
+                        <p class="font-medium">${item.product.name}</p>
+                        <p class="text-sm text-gray-600">${item.weight.toFixed(2)} kg × $${item.product.price.toFixed(2)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold">$${item.subtotal.toFixed(2)}</p>
+                        <button onclick="removeFromCart(${index})" class="text-red-600 text-sm hover:underline">
+                            Eliminar
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            totalEl.textContent = '$' + total.toFixed(2);
+        }
+
+        // Remove from cart
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCart();
+        }
+
+        // Clear cart
+        function clearCart() {
+            if (cart.length === 0) return;
+            if (confirm('¿Seguro que deseas vaciar el carrito?')) {
+                cart = [];
+                updateCart();
+            }
+        }
+
+        // Process checkout
+        function processCheckout() {
+            if (cart.length === 0) {
+                alert('El carrito está vacío');
+                return;
+            }
+
+            showInvoice();
+        }
+
+        // Show invoice
+        function showInvoice() {
+            const modal = document.getElementById('invoiceModal');
+            const itemsContainer = document.getElementById('invoiceItems');
+            
+            const saleDate = new Date();
+            const invoiceNum = invoiceCounter.toString().padStart(6, '0');
+            
+            // Set invoice details
+            document.getElementById('invoiceNumber').textContent = invoiceNum;
+            document.getElementById('invoiceDate').textContent = saleDate.toLocaleString('es-CO');
+            document.getElementById('invoiceUser').textContent = currentUser;
+
+            // Add items
+            itemsContainer.innerHTML = '';
+            let total = 0;
+
+            cart.forEach(item => {
+                total += item.subtotal;
+                const tr = document.createElement('tr');
+                tr.className = 'border-b';
+                tr.innerHTML = `
+                    <td class="py-2">${item.product.name}</td>
+                    <td class="text-right">${item.weight.toFixed(2)}</td>
+                    <td class="text-right">$${item.product.price.toFixed(2)}</td>
+                    <td class="text-right font-bold">$${item.subtotal.toFixed(2)}</td>
+                `;
+                itemsContainer.appendChild(tr);
+            });
+
+            document.getElementById('invoiceTotal').textContent = '$' + total.toFixed(2);
+
+            // Save sale to history
+            const sale = {
+                invoiceNumber: invoiceNum,
+                date: saleDate.toISOString(),
+                user: currentUser,
+                items: JSON.parse(JSON.stringify(cart)),
+                total: total
+            };
+            salesHistory.push(sale);
+
+            modal.classList.remove('hidden');
+
+            // Increment invoice counter
+            invoiceCounter++;
+            saveData();
+            updateStats();
+        }
+
+        // Print invoice
+        function printInvoice() {
+            window.print();
+        }
+
+        // Close invoice
+        function closeInvoice() {
+            document.getElementById('invoiceModal').classList.add('hidden');
+            cart = [];
+            updateCart();
+        }
+
+        // Add product (admin)
+        function addProduct(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('productName').value;
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const category = document.getElementById('productCategory').value;
+
+            const newProduct = {
+                id: Date.now(),
+                name: name,
+                price: price,
+                category: category
             };
 
-            return (
-                <div className="min-h-screen bg-gray-100">
-                    <div className="bg-red-600 text-white p-4">
-                        <div className="container mx-auto flex justify-between items-center">
-                            <h1 className="text-2xl font-bold">Panel de Administración - {user.nombre}</h1>
-                            <button onClick={() => setUser(null)} className="bg-red-700 px-4 py-2 rounded-lg hover:bg-red-800 flex items-center gap-2">
-                                <Icon name="LogOut" className="w-5 h-5" />
-                                Salir
-                            </button>
-                        </div>
-                    </div>
+            products.push(newProduct);
+            saveData();
 
-                    <div className="container mx-auto p-4">
-                        <div className="bg-white rounded-xl p-2 flex gap-2 mb-6">
-                            <button onClick={() => setActiveTab('products')} className={`flex-1 py-3 rounded-lg font-semibold ${activeTab === 'products' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}>
-                                <Icon name="Package" className="w-5 h-5 inline mr-2" />
-                                Productos
-                            </button>
-                            <button onClick={() => setActiveTab('dian')} className={`flex-1 py-3 rounded-lg font-semibold ${activeTab === 'dian' ? 'bg-red-600 text-white' : 'hover:bg-gray-100'}`}>
-                                <Icon name="Receipt" className="w-5 h-5 inline mr-2" />
-                                Config
+            // Reset form
+            document.getElementById('productName').value = '';
+            document.getElementById('productPrice').value = '';
+
+            loadProductsToSales();
+            loadProductsToAdmin();
+            updateStats();
+
+            alert('Producto agregado exitosamente');
+        }
+
+        // Load products to admin
+        function loadProductsToAdmin() {
+            const container = document.getElementById('adminProductsList');
+            if (!container) return;
+            
+            container.innerHTML = '';
+
+            if (products.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">No hay productos registrados</p>';
+                return;
+            }
+
+            products.forEach(product => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded';
+                div.innerHTML = `
+                    <div>
+                        <p class="font-medium">${product.name}</p>
+                        <p class="text-sm text-gray-600">${product.category} - $${product.price.toFixed(2)}/kg</p>
+                    </div>
+                    <button onclick="deleteProduct(${product.id})" class="text-red-600 hover:text-red-800">
+                        🗑️
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Delete product
+        function deleteProduct(id) {
+            if (confirm('¿Seguro que deseas eliminar este producto?')) {
+                products = products.filter(p => p.id !== id);
+                saveData();
+                loadProductsToSales();
+                loadProductsToAdmin();
+                updateStats();
+            }
+        }
+
+        // Save scale configuration
+        function saveScaleConfig() {
+            scaleConfig = {
+                port: document.getElementById('scalePort').value,
+                baud: document.getElementById('scaleBaud').value,
+                protocol: document.getElementById('scaleProtocol').value,
+                stabilization: document.getElementById('scaleStabilization').value
+            };
+            saveData();
+            alert('Configuración de balanza guardada exitosamente');
+        }
+
+        // Load scale config to form
+        function loadScaleConfigToForm() {
+            if (scaleConfig.port) document.getElementById('scalePort').value = scaleConfig.port;
+            if (scaleConfig.baud) document.getElementById('scaleBaud').value = scaleConfig.baud;
+            if (scaleConfig.protocol) document.getElementById('scaleProtocol').value = scaleConfig.protocol;
+            if (scaleConfig.stabilization) document.getElementById('scaleStabilization').value = scaleConfig.stabilization;
+        }
+
+        // Load sales history
+        function loadSalesHistory() {
+            const tbody = document.getElementById('salesTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (filteredSales.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No hay ventas registradas</td></tr>';
+                return;
+            }
+
+            filteredSales.forEach(sale => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b hover:bg-gray-50';
+                
+                const date = new Date(sale.date);
+                const itemsSummary = sale.items.map(item => item.product.name).join(', ');
+                
+                tr.innerHTML = `
+                    <td class="p-3">#${sale.invoiceNumber}</td>
+                    <td class="p-3">${date.toLocaleString('es-CO')}</td>
+                    <td class="p-3">${sale.user}</td>
+                    <td class="p-3 text-sm">${itemsSummary}</td>
+                    <td class="p-3 text-right font-bold">$${sale.total.toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="viewSaleDetail(${salesHistory.indexOf(sale)})" class="text-blue-600 hover:underline text-sm">
+                            Ver Detalle
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Filter sales
+        function filterSales() {
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            const dateTo = document.getElementById('filterDateTo').value;
+            const user = document.getElementById('filterUser').value;
+
+            filteredSales = salesHistory.filter(sale => {
+                const saleDate = new Date(sale.date).toISOString().split('T')[0];
+                
+                const dateMatch = (!dateFrom || saleDate >= dateFrom) && 
+                                 (!dateTo || saleDate <= dateTo);
+                const userMatch = !user || sale.user === user;
+                
+                return dateMatch && userMatch;
+            });
+
+            // Update summary
+            const total = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+            const count = filteredSales.length;
+            const average = count > 0 ? total / count : 0;
+
+            document.getElementById('filteredTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('filteredCount').textContent = count;
+            document.getElementById('filteredAverage').textContent = '$' + average.toFixed(2);
+
+            loadSalesHistory();
+        }
+
+        // View sale detail
+        function viewSaleDetail(index) {
+            const sale = salesHistory[index];
+            let detail = `Factura #${sale.invoiceNumber}\n`;
+            detail += `Fecha: ${new Date(sale.date).toLocaleString('es-CO')}\n`;
+            detail += `Usuario: ${sale.user}\n\n`;
+            detail += `Productos:\n`;
+            
+            sale.items.forEach(item => {
+                detail += `- ${item.product.name}: ${item.weight.toFixed(2)} kg × $${item.product.price.toFixed(2)} = $${item.subtotal.toFixed(2)}\n`;
+            });
+            
+            detail += `\nTotal: $${sale.total.toFixed(2)}`;
+            
+            alert(detail);
+        }
+
+        // Export sales to CSV
+        function exportSales() {
+            if (filteredSales.length === 0) {
+                alert('No hay ventas para exportar');
+                return;
+            }
+
+            let csv = 'Factura,Fecha,Usuario,Productos,Total\n';
+            
+            filteredSales.forEach(sale => {
+                const date = new Date(sale.date).toLocaleString('es-CO');
+                const items = sale.items.map(item => `${item.product.name} (${item.weight.toFixed(2)}kg)`).join(' | ');
+                csv += `#${sale.invoiceNumber},"${date}",${sale.user},"${items}",${sale.total.toFixed(2)}\n`;
+            });
+
+            // Create download link
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `ventas_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Print sales report
+        function printSalesReport() {
+            if (filteredSales.length === 0) {
+                alert('No hay ventas para imprimir');
+                return;
+            }
+
+            const modal = document.getElementById('salesReportModal');
+            const tbody = document.getElementById('reportTableBody');
+
+            // Set report details
+            document.getElementById('reportDate').textContent = new Date().toLocaleString('es-CO');
+            
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            const dateTo = document.getElementById('filterDateTo').value;
+            let period = 'Todas las ventas';
+            if (dateFrom && dateTo) {
+                period = `${dateFrom} al ${dateTo}`;
+            } else if (dateFrom) {
+                period = `Desde ${dateFrom}`;
+            } else if (dateTo) {
+                period = `Hasta ${dateTo}`;
+            }
+            document.getElementById('reportPeriod').textContent = period;
+
+            // Set summary
+            const total = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+            const count = filteredSales.length;
+            const average = count > 0 ? total / count : 0;
+
+            document.getElementById('reportTotalSales').textContent = '$' + total.toFixed(2);
+            document.getElementById('reportTransactions').textContent = count;
+            document.getElementById('reportAverage').textContent = '$' + average.toFixed(2);
+
+            // Add sales to table
+            tbody.innerHTML = '';
+            filteredSales.forEach(sale => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b';
+                
+                const date = new Date(sale.date);
+                const itemsSummary = sale.items.map(item => item.product.name).join(', ');
+                
+                tr.innerHTML = `
+                    <td class="p-2">#${sale.invoiceNumber}</td>
+                    <td class="p-2">${date.toLocaleDateString('es-CO')}</td>
+                    <td class="p-2">${sale.user}</td>
+                    <td class="p-2 text-sm">${itemsSummary}</td>
+                    <td class="p-2 text-right font-bold">$${sale.total.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        // Close sales report
+        function closeSalesReport() {
+            document.getElementById('salesReportModal').classList.add('hidden');
+        }
+
+        // Initialize when page loads
+        window.onload = initApp;
+    </script>
+</body>
+</html>
