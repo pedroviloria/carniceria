@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Carnicería</title>
+    <title>Sistema de Gestión para Cantera</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @media print {
@@ -12,34 +12,49 @@
             .print-area { position: absolute; left: 0; top: 0; width: 100%; }
             .no-print { display: none !important; }
         }
-        .scale-indicator { animation: pulse 1s infinite; }
+        .scale-indicator { animation: pulse 1.5s infinite; }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.3; }
         }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-pending { background-color: #FEF3C7; color: #92400E; }
+        .status-in-process { background-color: #DBEAFE; color: #1E40AF; }
+        .status-completed { background-color: #D1FAE5; color: #065F46; }
+        .status-delivered { background-color: #E9D5FF; color: #6B21A8; }
     </style>
 </head>
 <body class="bg-gray-100">
     <!-- Login Screen -->
-    <div id="loginScreen" class="min-h-screen flex items-center justify-center">
-        <div class="bg-white p-8 rounded-lg shadow-lg w-96">
-            <h1 class="text-3xl font-bold text-center mb-2 text-red-600">🥩 Carnicería</h1>
-            <h2 class="text-xl text-center mb-6 text-gray-600">Sistema de Ventas</h2>
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-96">
+            <div class="text-center mb-6">
+                <div class="text-6xl mb-3">🏔️</div>
+                <h1 class="text-3xl font-bold text-gray-800">Sistema de Cantera</h1>
+                <h2 class="text-lg text-gray-600 mt-2">Gestión Integral</h2>
+            </div>
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Usuario</label>
-                    <input type="text" id="loginUser" class="w-full p-2 border rounded" placeholder="admin o vendedor">
+                    <input type="text" id="loginUser" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Ingrese usuario">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Contraseña</label>
-                    <input type="password" id="loginPass" class="w-full p-2 border rounded" placeholder="Contraseña">
+                    <input type="password" id="loginPass" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Ingrese contraseña">
                 </div>
-                <button onclick="login()" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">
-                    Ingresar
+                <button onclick="login()" class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold transition">
+                    Ingresar al Sistema
                 </button>
-                <div class="text-xs text-gray-500 mt-4 p-3 bg-gray-50 rounded">
-                    <p><strong>Admin:</strong> usuario: admin / contraseña: admin123</p>
-                    <p><strong>Vendedor:</strong> usuario: vendedor / contraseña: vendedor123</p>
+                <div class="text-xs text-gray-600 mt-4 p-4 bg-gray-50 rounded-lg">
+                    <p class="font-semibold mb-2">Usuarios de prueba:</p>
+                    <p><strong>Admin:</strong> admin / admin123</p>
+                    <p><strong>Operador:</strong> operador / operador123</p>
+                    <p><strong>Báscula:</strong> bascula / bascula123</p>
                 </div>
             </div>
         </div>
@@ -48,12 +63,21 @@
     <!-- Main Application -->
     <div id="mainApp" class="hidden">
         <!-- Header -->
-        <header class="bg-red-600 text-white p-4 shadow-lg">
+        <header class="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 shadow-lg">
             <div class="container mx-auto flex justify-between items-center">
-                <h1 class="text-2xl font-bold">🥩 Sistema Carnicería</h1>
+                <div class="flex items-center gap-3">
+                    <span class="text-4xl">🏔️</span>
+                    <div>
+                        <h1 class="text-2xl font-bold">Sistema de Cantera</h1>
+                        <p class="text-sm text-gray-300">Gestión Integral de Operaciones</p>
+                    </div>
+                </div>
                 <div class="flex items-center gap-4">
-                    <span id="userDisplay" class="font-medium"></span>
-                    <button onclick="logout()" class="bg-red-700 px-4 py-2 rounded hover:bg-red-800">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-300">Usuario</p>
+                        <p id="userDisplay" class="font-semibold"></p>
+                    </div>
+                    <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 transition">
                         Cerrar Sesión
                     </button>
                 </div>
@@ -61,1090 +85,615 @@
         </header>
 
         <!-- Navigation Tabs -->
-        <div class="bg-white shadow">
+        <div class="bg-white shadow-md">
             <div class="container mx-auto">
-                <div class="flex">
-                    <button onclick="showTab('sales')" id="tabSales" class="px-6 py-3 font-medium border-b-2 border-red-600">
-                        Ventas
+                <div class="flex overflow-x-auto">
+                    <button onclick="showTab('dashboard')" id="tabDashboard" class="nav-tab px-6 py-3 font-medium border-b-2 border-blue-600">
+                        📊 Dashboard
                     </button>
-                    <button onclick="showTab('admin')" id="tabAdmin" class="px-6 py-3 font-medium text-gray-500 hidden">
-                        Administración
+                    <button onclick="showTab('orders')" id="tabOrders" class="nav-tab px-6 py-3 font-medium text-gray-500">
+                        📋 Pedidos
+                    </button>
+                    <button onclick="showTab('weighing')" id="tabWeighing" class="nav-tab px-6 py-3 font-medium text-gray-500">
+                        ⚖️ Báscula
+                    </button>
+                    <button onclick="showTab('customers')" id="tabCustomers" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        👥 Clientes
+                    </button>
+                    <button onclick="showTab('materials')" id="tabMaterials" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        🪨 Materiales
+                    </button>
+                    <button onclick="showTab('vehicles')" id="tabVehicles" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        🚛 Vehículos
+                    </button>
+                    <button onclick="showTab('reports')" id="tabReports" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        📈 Reportes
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Sales Section -->
-        <div id="salesSection" class="container mx-auto p-6">
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="container mx-auto p-6">
+            <h2 class="text-2xl font-bold mb-6">Panel de Control</h2>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-blue-100 text-sm mb-1">Pedidos Activos</p>
+                            <p id="kpiActiveOrders" class="text-4xl font-bold">0</p>
+                        </div>
+                        <div class="text-4xl">📋</div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-green-100 text-sm mb-1">Ventas Hoy</p>
+                            <p id="kpiSalesToday" class="text-4xl font-bold">$0</p>
+                        </div>
+                        <div class="text-4xl">💰</div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-orange-100 text-sm mb-1">Vehículos en Planta</p>
+                            <p id="kpiVehicles" class="text-4xl font-bold">0</p>
+                        </div>
+                        <div class="text-4xl">🚛</div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-purple-100 text-sm mb-1">Toneladas Hoy</p>
+                            <p id="kpiTonnes" class="text-4xl font-bold">0</p>
+                        </div>
+                        <div class="text-4xl">⚖️</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity and Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Recent Orders -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold mb-4">Pedidos Recientes</h3>
+                    <div id="recentOrders" class="space-y-3">
+                        <p class="text-gray-500 text-center py-8">No hay pedidos recientes</p>
+                    </div>
+                </div>
+
+                <!-- Recent Weighings -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold mb-4">Pesajes Recientes</h3>
+                    <div id="recentWeighings" class="space-y-3">
+                        <p class="text-gray-500 text-center py-8">No hay pesajes recientes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Section -->
+        <div id="ordersSection" class="container mx-auto p-6 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Gestión de Pedidos</h2>
+                <button onclick="showNewOrderModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    ➕ Nuevo Pedido
+                </button>
+            </div>
+
+            <!-- Orders Filter -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Estado</label>
+                        <select id="filterOrderStatus" onchange="filterOrders()" class="w-full p-2 border rounded">
+                            <option value="">Todos</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="in-process">En Proceso</option>
+                            <option value="completed">Completado</option>
+                            <option value="delivered">Entregado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Cliente</label>
+                        <select id="filterOrderCustomer" onchange="filterOrders()" class="w-full p-2 border rounded">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Fecha Desde</label>
+                        <input type="date" id="filterOrderDateFrom" onchange="filterOrders()" class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Fecha Hasta</label>
+                        <input type="date" id="filterOrderDateTo" onchange="filterOrders()" class="w-full p-2 border rounded">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Table -->
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100 border-b">
+                        <tr>
+                            <th class="text-left p-4">Pedido #</th>
+                            <th class="text-left p-4">Cliente</th>
+                            <th class="text-left p-4">Material</th>
+                            <th class="text-right p-4">Cantidad (Ton)</th>
+                            <th class="text-right p-4">Entregado (Ton)</th>
+                            <th class="text-left p-4">Fecha Entrega</th>
+                            <th class="text-left p-4">Estado</th>
+                            <th class="text-center p-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        <tr><td colspan="8" class="text-center py-8 text-gray-500">No hay pedidos registrados</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Weighing Section -->
+        <div id="weighingSection" class="container mx-auto p-6 hidden">
+            <h2 class="text-2xl font-bold mb-6">Sistema de Báscula</h2>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Products List -->
+                <!-- Weighing Form -->
                 <div class="lg:col-span-2">
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-xl font-bold mb-4">Productos Disponibles</h2>
-                        <div id="productsList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <!-- Products will be loaded here -->
+                        <h3 class="text-xl font-bold mb-6">Nuevo Pesaje</h3>
+
+                        <!-- Scale Display -->
+                        <div class="mb-6 bg-gray-900 rounded-lg p-8 text-center">
+                            <div class="flex items-center justify-center gap-3 mb-3">
+                                <span class="scale-indicator text-green-400 text-3xl">●</span>
+                                <span class="text-white text-lg">Báscula Conectada</span>
+                            </div>
+                            <div class="text-6xl font-bold text-green-400 mb-2">
+                                <span id="currentWeight">0.00</span>
+                            </div>
+                            <div class="text-2xl text-gray-400">Toneladas</div>
                         </div>
+
+                        <form onsubmit="processWeighing(event)" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Tipo de Pesaje *</label>
+                                    <select id="weighType" required onchange="handleWeighTypeChange()" class="w-full p-3 border rounded-lg">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="entry">Entrada (Vehículo Vacío)</option>
+                                        <option value="exit">Salida (Vehículo Cargado)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Placa del Vehículo *</label>
+                                    <input type="text" id="weighPlate" required class="w-full p-3 border rounded-lg uppercase" placeholder="ABC-123">
+                                </div>
+                            </div>
+
+                            <div id="exitWeighFields" class="hidden space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Pedido Asociado *</label>
+                                    <select id="weighOrder" class="w-full p-3 border rounded-lg">
+                                        <option value="">Seleccionar pedido...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Conductor</label>
+                                <input type="text" id="weighDriver" class="w-full p-3 border rounded-lg" placeholder="Nombre del conductor">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Observaciones</label>
+                                <textarea id="weighNotes" class="w-full p-3 border rounded-lg" rows="3" placeholder="Notas adicionales..."></textarea>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="submit" class="flex-1 bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 font-semibold transition">
+                                    ⚖️ Registrar Pesaje
+                                </button>
+                                <button type="button" onclick="clearWeighForm()" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400 transition">
+                                    Limpiar
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
-                <!-- Cart and Weight -->
+                <!-- Recent Weighings Sidebar -->
                 <div>
-                    <!-- Weight Scale -->
-                    <div class="bg-white rounded-lg shadow p-6 mb-6">
-                        <h3 class="text-lg font-bold mb-4">⚖️ Balanza</h3>
-                        <div class="mb-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-sm text-gray-600">Modo:</span>
-                                <div class="flex gap-2">
-                                    <button onclick="setWeightMode('auto')" id="autoMode" class="px-3 py-1 text-sm rounded bg-red-600 text-white">
-                                        Automático
-                                    </button>
-                                    <button onclick="setWeightMode('manual')" id="manualMode" class="px-3 py-1 text-sm rounded bg-gray-200">
-                                        Manual
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="autoWeightSection">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="scale-indicator text-green-500 text-2xl">●</span>
-                                    <span class="text-sm">Conectado</span>
-                                </div>
-                                <div class="text-4xl font-bold text-center p-4 bg-gray-50 rounded">
-                                    <span id="autoWeight">0.00</span> kg
-                                </div>
-                            </div>
-                            <div id="manualWeightSection" class="hidden">
-                                <input type="number" id="manualWeight" step="0.01" min="0" 
-                                       class="w-full p-3 text-2xl text-center border rounded" 
-                                       placeholder="0.00">
-                                <span class="block text-center text-sm text-gray-600 mt-1">kg</span>
-                            </div>
-                        </div>
-                        <div id="selectedProduct" class="mb-4 p-3 bg-blue-50 rounded hidden">
-                            <p class="font-medium">Producto seleccionado:</p>
-                            <p id="selectedProductName" class="text-lg"></p>
-                        </div>
-                        <button onclick="addToCart()" class="w-full bg-green-600 text-white p-3 rounded hover:bg-green-700 font-bold">
-                            Agregar al Carrito
-                        </button>
-                    </div>
-
-                    <!-- Cart -->
                     <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-bold mb-4">🛒 Carrito</h3>
-                        <div id="cartItems" class="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                            <p class="text-gray-500 text-center py-8">Carrito vacío</p>
-                        </div>
-                        <div class="border-t pt-4">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="text-xl font-bold">Total:</span>
-                                <span id="cartTotal" class="text-2xl font-bold text-red-600">$0.00</span>
-                            </div>
-                            <div class="space-y-2">
-                                <button onclick="processCheckout()" class="w-full bg-red-600 text-white p-3 rounded hover:bg-red-700 font-bold">
-                                    Procesar Venta
-                                </button>
-                                <button onclick="clearCart()" class="w-full bg-gray-300 text-gray-700 p-2 rounded hover:bg-gray-400">
-                                    Limpiar Carrito
-                                </button>
-                            </div>
+                        <h3 class="text-lg font-bold mb-4">Últimos Pesajes</h3>
+                        <div id="weighingSidebar" class="space-y-3 max-h-96 overflow-y-auto">
+                            <p class="text-gray-500 text-center py-8">No hay pesajes registrados</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Admin Section -->
-        <div id="adminSection" class="container mx-auto p-6 hidden">
-            <!-- Admin Tabs -->
-            <div class="mb-6 flex gap-2">
-                <button onclick="showAdminTab('products')" id="adminTabProducts" class="px-4 py-2 bg-red-600 text-white rounded">
-                    📦 Productos
-                </button>
-                <button onclick="showAdminTab('scale')" id="adminTabScale" class="px-4 py-2 bg-gray-300 rounded">
-                    ⚖️ Balanza
-                </button>
-                <button onclick="showAdminTab('sales')" id="adminTabSales" class="px-4 py-2 bg-gray-300 rounded">
-                    📊 Ventas
+        <!-- Customers Section -->
+        <div id="customersSection" class="container mx-auto p-6 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Gestión de Clientes</h2>
+                <button onclick="showNewCustomerModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    ➕ Nuevo Cliente
                 </button>
             </div>
 
-            <!-- Products Management -->
-            <div id="adminProductsSection" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Product Management -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-bold mb-4">📦 Gestión de Productos</h2>
-                    <form onsubmit="addProduct(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Nombre del Producto</label>
-                            <input type="text" id="productName" required class="w-full p-2 border rounded" placeholder="Ej: Carne de Res">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Precio por Kg ($)</label>
-                            <input type="number" id="productPrice" step="0.01" min="0" required class="w-full p-2 border rounded" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Categoría</label>
-                            <select id="productCategory" class="w-full p-2 border rounded">
-                                <option value="Res">Res</option>
-                                <option value="Cerdo">Cerdo</option>
-                                <option value="Pollo">Pollo</option>
-                                <option value="Cordero">Cordero</option>
-                                <option value="Otros">Otros</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">
-                            Agregar Producto
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="customersList">
+                <p class="col-span-full text-gray-500 text-center py-8">No hay clientes registrados</p>
+            </div>
+        </div>
+
+        <!-- Materials Section -->
+        <div id="materialsSection" class="container mx-auto p-6 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Gestión de Materiales</h2>
+                <button onclick="showNewMaterialModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    ➕ Nuevo Material
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="materialsList">
+                <p class="col-span-full text-gray-500 text-center py-8">No hay materiales registrados</p>
+            </div>
+        </div>
+
+        <!-- Vehicles Section -->
+        <div id="vehiclesSection" class="container mx-auto p-6 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Gestión de Vehículos</h2>
+                <button onclick="showNewVehicleModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    ➕ Nuevo Vehículo
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100 border-b">
+                        <tr>
+                            <th class="text-left p-4">Placa</th>
+                            <th class="text-left p-4">Tipo</th>
+                            <th class="text-right p-4">Capacidad (Ton)</th>
+                            <th class="text-left p-4">Conductor Habitual</th>
+                            <th class="text-left p-4">Estado</th>
+                            <th class="text-center p-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vehiclesTableBody">
+                        <tr><td colspan="6" class="text-center py-8 text-gray-500">No hay vehículos registrados</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reportsSection" class="container mx-auto p-6 hidden">
+            <h2 class="text-2xl font-bold mb-6">Reportes y Estadísticas</h2>
+
+            <!-- Report Filters -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Fecha Desde</label>
+                        <input type="date" id="reportDateFrom" class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Fecha Hasta</label>
+                        <input type="date" id="reportDateTo" class="w-full p-2 border rounded">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="generateReports()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
+                            📊 Generar Reportes
                         </button>
-                    </form>
-
-                    <!-- Products List for Admin -->
-                    <div class="mt-6">
-                        <h3 class="font-bold mb-3">Productos Registrados</h3>
-                        <div id="adminProductsList" class="space-y-2 max-h-96 overflow-y-auto">
-                            <!-- Products will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Stats -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-bold mb-4">📈 Estadísticas Rápidas</h2>
-                    <div class="space-y-4">
-                        <div class="p-4 bg-blue-50 rounded">
-                            <p class="text-sm text-gray-600">Total Productos</p>
-                            <p id="statsProducts" class="text-3xl font-bold text-blue-600">0</p>
-                        </div>
-                        <div class="p-4 bg-green-50 rounded">
-                            <p class="text-sm text-gray-600">Ventas Hoy</p>
-                            <p id="statsSalesToday" class="text-3xl font-bold text-green-600">$0.00</p>
-                        </div>
-                        <div class="p-4 bg-purple-50 rounded">
-                            <p class="text-sm text-gray-600">Ventas Totales</p>
-                            <p id="statsSalesTotal" class="text-3xl font-bold text-purple-600">$0.00</p>
-                        </div>
-                        <div class="p-4 bg-orange-50 rounded">
-                            <p class="text-sm text-gray-600">Total Transacciones</p>
-                            <p id="statsTransactions" class="text-3xl font-bold text-orange-600">0</p>
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Scale Configuration -->
-            <div id="adminScaleSection" class="hidden">
-                <div class="bg-white rounded-lg shadow p-6 max-w-2xl">
-                    <h2 class="text-xl font-bold mb-4">⚙️ Configuración de Balanza</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Puerto Serial</label>
-                            <input type="text" id="scalePort" class="w-full p-2 border rounded" placeholder="COM3 o /dev/ttyUSB0">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Velocidad (Baud Rate)</label>
-                            <select id="scaleBaud" class="w-full p-2 border rounded">
-                                <option value="9600">9600</option>
-                                <option value="19200">19200</option>
-                                <option value="38400">38400</option>
-                                <option value="57600">57600</option>
-                                <option value="115200">115200</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Protocolo</label>
-                            <select id="scaleProtocol" class="w-full p-2 border rounded">
-                                <option value="standard">Estándar</option>
-                                <option value="toledo">Toledo</option>
-                                <option value="mettler">Mettler Toledo</option>
-                                <option value="custom">Personalizado</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Tiempo de estabilización (ms)</label>
-                            <input type="number" id="scaleStabilization" class="w-full p-2 border rounded" value="1000">
-                        </div>
-                        <button onclick="saveScaleConfig()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
-                            Guardar Configuración
-                        </button>
-                        <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                            <p class="font-medium">⚠️ Nota:</p>
-                            <p>Para conexión real con balanza serial, este sistema debe ejecutarse en un servidor local con acceso a puertos COM.</p>
-                        </div>
-                    </div>
+            <!-- Report Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm text-gray-600 mb-1">Total Ventas</p>
+                    <p id="reportTotalSales" class="text-3xl font-bold text-blue-600">$0.00</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm text-gray-600 mb-1">Total Toneladas</p>
+                    <p id="reportTotalTonnes" class="text-3xl font-bold text-green-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm text-gray-600 mb-1">Pedidos Completados</p>
+                    <p id="reportCompletedOrders" class="text-3xl font-bold text-purple-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <p class="text-sm text-gray-600 mb-1">Precio Promedio/Ton</p>
+                    <p id="reportAvgPrice" class="text-3xl font-bold text-orange-600">$0</p>
                 </div>
             </div>
 
-            <!-- Sales History -->
-            <div id="adminSalesSection" class="hidden">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold">📊 Historial de Ventas</h2>
-                        <div class="flex gap-2">
-                            <button onclick="exportSales()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                                📥 Exportar CSV
-                            </button>
-                            <button onclick="printSalesReport()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                🖨️ Imprimir Reporte
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Filters -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Fecha Desde</label>
-                            <input type="date" id="filterDateFrom" class="w-full p-2 border rounded">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Fecha Hasta</label>
-                            <input type="date" id="filterDateTo" class="w-full p-2 border rounded">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Usuario</label>
-                            <select id="filterUser" class="w-full p-2 border rounded">
-                                <option value="">Todos</option>
-                                <option value="Administrador">Administrador</option>
-                                <option value="Vendedor">Vendedor</option>
-                            </select>
-                        </div>
-                        <div class="flex items-end">
-                            <button onclick="filterSales()" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">
-                                Filtrar
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Sales Summary -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="p-4 bg-blue-50 rounded">
-                            <p class="text-sm text-gray-600">Total Ventas Filtradas</p>
-                            <p id="filteredTotal" class="text-2xl font-bold text-blue-600">$0.00</p>
-                        </div>
-                        <div class="p-4 bg-green-50 rounded">
-                            <p class="text-sm text-gray-600">Número de Transacciones</p>
-                            <p id="filteredCount" class="text-2xl font-bold text-green-600">0</p>
-                        </div>
-                        <div class="p-4 bg-purple-50 rounded">
-                            <p class="text-sm text-gray-600">Ticket Promedio</p>
-                            <p id="filteredAverage" class="text-2xl font-bold text-purple-600">$0.00</p>
-                        </div>
-                    </div>
-
-                    <!-- Sales Table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full" id="salesTable">
-                            <thead>
-                                <tr class="bg-gray-100">
-                                    <th class="text-left p-3">Factura #</th>
-                                    <th class="text-left p-3">Fecha</th>
-                                    <th class="text-left p-3">Usuario</th>
-                                    <th class="text-left p-3">Productos</th>
-                                    <th class="text-right p-3">Total</th>
-                                    <th class="text-center p-3">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="salesTableBody">
-                                <!-- Sales will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Sales by Material -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-bold mb-4">Ventas por Material</h3>
+                <div id="salesByMaterial" class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="text-left p-3">Material</th>
+                                <th class="text-right p-3">Toneladas</th>
+                                <th class="text-right p-3">Pedidos</th>
+                                <th class="text-right p-3">Ventas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesByMaterialBody">
+                            <tr><td colspan="4" class="text-center py-8 text-gray-500">No hay datos</td></tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="flex gap-4">
+                <button onclick="exportReportCSV()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">
+                    📥 Exportar CSV
+                </button>
+                <button onclick="printReport()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                    🖨️ Imprimir Reporte
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Invoice Modal -->
-    <div id="invoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <!-- New Order Modal -->
+    <div id="newOrderModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-6">Nuevo Pedido</h2>
+            <form onsubmit="createOrder(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Cliente *</label>
+                        <select id="orderCustomer" required class="w-full p-3 border rounded-lg">
+                            <option value="">Seleccionar cliente...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Material *</label>
+                        <select id="orderMaterial" required class="w-full p-3 border rounded-lg">
+                            <option value="">Seleccionar material...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Cantidad (Toneladas) *</label>
+                        <input type="number" id="orderQuantity" step="0.01" min="0.01" required class="w-full p-3 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Fecha de Entrega *</label>
+                        <input type="date" id="orderDeliveryDate" required class="w-full p-3 border rounded-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Observaciones</label>
+                    <textarea id="orderNotes" class="w-full p-3 border rounded-lg" rows="3"></textarea>
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        Crear Pedido
+                    </button>
+                    <button type="button" onclick="closeModal('newOrderModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Customer Modal -->
+    <div id="newCustomerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
+            <h2 class="text-2xl font-bold mb-6">Nuevo Cliente</h2>
+            <form onsubmit="createCustomer(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Nombre/Razón Social *</label>
+                        <input type="text" id="customerName" required class="w-full p-3 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">NIT/RUC/ID *</label>
+                        <input type="text" id="customerTaxId" required class="w-full p-3 border rounded-lg">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Teléfono</label>
+                        <input type="tel" id="customerPhone" class="w-full p-3 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" id="customerEmail" class="w-full p-3 border rounded-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Dirección</label>
+                    <input type="text" id="customerAddress" class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Límite de Crédito ($)</label>
+                    <input type="number" id="customerCreditLimit" step="0.01" min="0" value="0" class="w-full p-3 border rounded-lg">
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        Crear Cliente
+                    </button>
+                    <button type="button" onclick="closeModal('newCustomerModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Material Modal -->
+    <div id="newMaterialModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <h2 class="text-2xl font-bold mb-6">Nuevo Material</h2>
+            <form onsubmit="createMaterial(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nombre del Material *</label>
+                    <input type="text" id="materialName" required class="w-full p-3 border rounded-lg" placeholder="Ej: Arena de Río">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tipo</label>
+                    <select id="materialType" class="w-full p-3 border rounded-lg">
+                        <option value="Arena">Arena</option>
+                        <option value="Grava">Grava</option>
+                        <option value="Piedra">Piedra</option>
+                        <option value="Roca">Roca</option>
+                        <option value="Triturado">Triturado</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Precio por Tonelada ($) *</label>
+                    <input type="number" id="materialPrice" step="0.01" min="0" required class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Stock Actual (Toneladas)</label>
+                    <input type="number" id="materialStock" step="0.01" min="0" value="0" class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Descripción</label>
+                    <textarea id="materialDescription" class="w-full p-3 border rounded-lg" rows="3"></textarea>
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        Crear Material
+                    </button>
+                    <button type="button" onclick="closeModal('newMaterialModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Vehicle Modal -->
+    <div id="newVehicleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <h2 class="text-2xl font-bold mb-6">Nuevo Vehículo</h2>
+            <form onsubmit="createVehicle(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Placa *</label>
+                    <input type="text" id="vehiclePlate" required class="w-full p-3 border rounded-lg uppercase" placeholder="ABC-123">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tipo de Vehículo</label>
+                    <select id="vehicleType" class="w-full p-3 border rounded-lg">
+                        <option value="Camión">Camión</option>
+                        <option value="Volqueta">Volqueta</option>
+                        <option value="Tracto-camión">Tracto-camión</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Capacidad (Toneladas) *</label>
+                    <input type="number" id="vehicleCapacity" step="0.01" min="0" required class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Conductor Habitual</label>
+                    <input type="text" id="vehicleDriver" class="w-full p-3 border rounded-lg">
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        Crear Vehículo
+                    </button>
+                    <button type="button" onclick="closeModal('newVehicleModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Weigh Ticket Modal -->
+    <div id="weighTicketModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
             <div class="print-area">
-                <div class="text-center mb-6">
-                    <h1 class="text-3xl font-bold text-red-600">🥩 CARNICERÍA</h1>
-                    <p class="text-gray-600">Sistema de Ventas</p>
-                    <p class="text-sm text-gray-500">Tel: (123) 456-7890</p>
-                </div>
-                
-                <div class="border-t border-b py-4 mb-4">
-                    <div class="flex justify-between mb-2">
-                        <span class="font-medium">Factura #:</span>
-                        <span id="invoiceNumber"></span>
-                    </div>
-                    <div class="flex justify-between mb-2">
-                        <span class="font-medium">Fecha:</span>
-                        <span id="invoiceDate"></span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="font-medium">Atendido por:</span>
-                        <span id="invoiceUser"></span>
-                    </div>
+                <div class="text-center mb-6 border-b pb-4">
+                    <div class="text-5xl mb-2">🏔️</div>
+                    <h1 class="text-2xl font-bold">TICKET DE BÁSCULA</h1>
+                    <p class="text-gray-600">Sistema de Cantera</p>
                 </div>
 
-                <table class="w-full mb-4">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left py-2">Producto</th>
-                            <th class="text-right py-2">Peso (kg)</th>
-                            <th class="text-right py-2">Precio/kg</th>
-                            <th class="text-right py-2">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody id="invoiceItems">
-                        <!-- Items will be added here -->
-                    </tbody>
-                </table>
-
-                <div class="border-t pt-4">
-                    <div class="flex justify-between text-2xl font-bold">
-                        <span>TOTAL:</span>
-                        <span id="invoiceTotal" class="text-red-600"></span>
-                    </div>
-                </div>
-
-                <div class="text-center mt-6 text-sm text-gray-500">
-                    <p>¡Gracias por su compra!</p>
-                    <p>Vuelva pronto</p>
-                </div>
-            </div>
-
-            <div class="flex gap-4 mt-6 no-print">
-                <button onclick="printInvoice()" class="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-700">
-                    🖨️ Imprimir
-                </button>
-                <button onclick="closeInvoice()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded hover:bg-gray-400">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sales Report Print Modal -->
-    <div id="salesReportModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-8 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
-            <div class="print-area">
-                <div class="text-center mb-6">
-                    <h1 class="text-3xl font-bold text-red-600">🥩 CARNICERÍA</h1>
-                    <h2 class="text-xl text-gray-700 mt-2">Reporte de Ventas</h2>
-                </div>
-                
-                <div class="border-t border-b py-4 mb-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <span class="font-medium">Fecha del Reporte:</span>
-                            <span id="reportDate"></span>
-                        </div>
-                        <div>
-                            <span class="font-medium">Período:</span>
-                            <span id="reportPeriod"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="text-center p-4 bg-blue-50 rounded">
-                        <p class="text-sm text-gray-600">Total Ventas</p>
-                        <p id="reportTotalSales" class="text-2xl font-bold text-blue-600">$0.00</p>
-                    </div>
-                    <div class="text-center p-4 bg-green-50 rounded">
-                        <p class="text-sm text-gray-600">Transacciones</p>
-                        <p id="reportTransactions" class="text-2xl font-bold text-green-600">0</p>
-                    </div>
-                    <div class="text-center p-4 bg-purple-50 rounded">
-                        <p class="text-sm text-gray-600">Ticket Promedio</p>
-                        <p id="reportAverage" class="text-2xl font-bold text-purple-600">$0.00</p>
-                    </div>
-                </div>
-
-                <table class="w-full mb-4">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="text-left p-2">Factura #</th>
-                            <th class="text-left p-2">Fecha</th>
-                            <th class="text-left p-2">Usuario</th>
-                            <th class="text-left p-2">Productos</th>
-                            <th class="text-right p-2">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportTableBody">
-                        <!-- Sales will be added here -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="flex gap-4 mt-6 no-print">
-                <button onclick="window.print()" class="flex-1 bg-blue-600 text-white p-3 rounded hover:bg-blue-700">
-                    🖨️ Imprimir
-                </button>
-                <button onclick="closeSalesReport()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded hover:bg-gray-400">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Global State
-        let currentUser = null;
-        let userRole = null;
-        let products = [];
-        let cart = [];
-        let scaleConfig = {};
-        let weightMode = 'auto';
-        let selectedProductForWeight = null;
-        let autoWeightInterval = null;
-        let invoiceCounter = 1;
-        let salesHistory = [];
-        let filteredSales = [];
-
-        // Initialize App
-        function initApp() {
-            loadData();
-            if (products.length === 0) {
-                loadDefaultProducts();
-            }
-            startAutoWeightSimulation();
-            setTodayDates();
-        }
-
-        // Set today's date in filters
-        function setTodayDates() {
-            const today = new Date().toISOString().split('T')[0];
-            const dateFrom = document.getElementById('filterDateFrom');
-            const dateTo = document.getElementById('filterDateTo');
-            if (dateFrom) dateFrom.value = today;
-            if (dateTo) dateTo.value = today;
-        }
-
-        // Load data from localStorage
-        function loadData() {
-            const savedProducts = localStorage.getItem('carniceria_products');
-            const savedScaleConfig = localStorage.getItem('carniceria_scaleConfig');
-            const savedInvoiceCounter = localStorage.getItem('carniceria_invoiceCounter');
-            const savedSalesHistory = localStorage.getItem('carniceria_salesHistory');
-            
-            if (savedProducts) products = JSON.parse(savedProducts);
-            if (savedScaleConfig) {
-                scaleConfig = JSON.parse(savedScaleConfig);
-                loadScaleConfigToForm();
-            }
-            if (savedInvoiceCounter) invoiceCounter = parseInt(savedInvoiceCounter);
-            if (savedSalesHistory) salesHistory = JSON.parse(savedSalesHistory);
-        }
-
-        // Save data to localStorage
-        function saveData() {
-            localStorage.setItem('carniceria_products', JSON.stringify(products));
-            localStorage.setItem('carniceria_scaleConfig', JSON.stringify(scaleConfig));
-            localStorage.setItem('carniceria_invoiceCounter', invoiceCounter.toString());
-            localStorage.setItem('carniceria_salesHistory', JSON.stringify(salesHistory));
-        }
-
-        // Load default products
-        function loadDefaultProducts() {
-            products = [
-                { id: 1, name: 'Carne de Res - Lomo', price: 25.00, category: 'Res' },
-                { id: 2, name: 'Carne de Res - Molida', price: 15.00, category: 'Res' },
-                { id: 3, name: 'Carne de Cerdo - Chuleta', price: 18.00, category: 'Cerdo' },
-                { id: 4, name: 'Pollo - Pechuga', price: 12.00, category: 'Pollo' },
-                { id: 5, name: 'Costillas de Cerdo', price: 20.00, category: 'Cerdo' },
-            ];
-            saveData();
-        }
-
-        // Login
-        function login() {
-            const user = document.getElementById('loginUser').value;
-            const pass = document.getElementById('loginPass').value;
-
-            if (user === 'admin' && pass === 'admin123') {
-                currentUser = 'Administrador';
-                userRole = 'admin';
-                showMainApp();
-            } else if (user === 'vendedor' && pass === 'vendedor123') {
-                currentUser = 'Vendedor';
-                userRole = 'vendedor';
-                showMainApp();
-            } else {
-                alert('Usuario o contraseña incorrectos');
-            }
-        }
-
-        // Show main app
-        function showMainApp() {
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            document.getElementById('userDisplay').textContent = currentUser;
-
-            if (userRole === 'admin') {
-                document.getElementById('tabAdmin').classList.remove('hidden');
-            }
-
-            loadProductsToSales();
-            loadProductsToAdmin();
-            updateStats();
-        }
-
-        // Logout
-        function logout() {
-            currentUser = null;
-            userRole = null;
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('mainApp').classList.add('hidden');
-            document.getElementById('loginUser').value = '';
-            document.getElementById('loginPass').value = '';
-        }
-
-        // Show tab
-        function showTab(tab) {
-            if (tab === 'sales') {
-                document.getElementById('salesSection').classList.remove('hidden');
-                document.getElementById('adminSection').classList.add('hidden');
-                document.getElementById('tabSales').classList.add('border-red-600', 'text-black');
-                document.getElementById('tabSales').classList.remove('text-gray-500');
-                if (document.getElementById('tabAdmin')) {
-                    document.getElementById('tabAdmin').classList.remove('border-red-600', 'text-black');
-                    document.getElementById('tabAdmin').classList.add('text-gray-500');
-                }
-            } else {
-                document.getElementById('salesSection').classList.add('hidden');
-                document.getElementById('adminSection').classList.remove('hidden');
-                document.getElementById('tabAdmin').classList.add('border-red-600', 'text-black');
-                document.getElementById('tabAdmin').classList.remove('text-gray-500');
-                document.getElementById('tabSales').classList.remove('border-red-600', 'text-black');
-                document.getElementById('tabSales').classList.add('text-gray-500');
-                
-                // Load sales when switching to admin
-                showAdminTab('products');
-            }
-        }
-
-        // Show admin tab
-        function showAdminTab(tab) {
-            // Hide all sections
-            document.getElementById('adminProductsSection').classList.add('hidden');
-            document.getElementById('adminScaleSection').classList.add('hidden');
-            document.getElementById('adminSalesSection').classList.add('hidden');
-
-            // Reset all tab buttons
-            document.getElementById('adminTabProducts').classList.remove('bg-red-600', 'text-white');
-            document.getElementById('adminTabProducts').classList.add('bg-gray-300');
-            document.getElementById('adminTabScale').classList.remove('bg-red-600', 'text-white');
-            document.getElementById('adminTabScale').classList.add('bg-gray-300');
-            document.getElementById('adminTabSales').classList.remove('bg-red-600', 'text-white');
-            document.getElementById('adminTabSales').classList.add('bg-gray-300');
-
-            // Show selected section and highlight tab
-            if (tab === 'products') {
-                document.getElementById('adminProductsSection').classList.remove('hidden');
-                document.getElementById('adminTabProducts').classList.add('bg-red-600', 'text-white');
-                document.getElementById('adminTabProducts').classList.remove('bg-gray-300');
-                updateStats();
-            } else if (tab === 'scale') {
-                document.getElementById('adminScaleSection').classList.remove('hidden');
-                document.getElementById('adminTabScale').classList.add('bg-red-600', 'text-white');
-                document.getElementById('adminTabScale').classList.remove('bg-gray-300');
-            } else if (tab === 'sales') {
-                document.getElementById('adminSalesSection').classList.remove('hidden');
-                document.getElementById('adminTabSales').classList.add('bg-red-600', 'text-white');
-                document.getElementById('adminTabSales').classList.remove('bg-gray-300');
-                loadSalesHistory();
-                filterSales();
-            }
-        }
-
-        // Update statistics
-        function updateStats() {
-            const statsProducts = document.getElementById('statsProducts');
-            const statsSalesToday = document.getElementById('statsSalesToday');
-            const statsSalesTotal = document.getElementById('statsSalesTotal');
-            const statsTransactions = document.getElementById('statsTransactions');
-
-            if (!statsProducts) return;
-
-            // Total products
-            statsProducts.textContent = products.length;
-
-            // Today's sales
-            const today = new Date().toDateString();
-            const todaySales = salesHistory.filter(sale => 
-                new Date(sale.date).toDateString() === today
-            );
-            const todayTotal = todaySales.reduce((sum, sale) => sum + sale.total, 0);
-            statsSalesToday.textContent = '$' + todayTotal.toFixed(2);
-
-            // Total sales
-            const totalSales = salesHistory.reduce((sum, sale) => sum + sale.total, 0);
-            statsSalesTotal.textContent = '$' + totalSales.toFixed(2);
-
-            // Total transactions
-            statsTransactions.textContent = salesHistory.length;
-        }
-
-        // Weight mode
-        function setWeightMode(mode) {
-            weightMode = mode;
-            if (mode === 'auto') {
-                document.getElementById('autoMode').classList.add('bg-red-600', 'text-white');
-                document.getElementById('autoMode').classList.remove('bg-gray-200');
-                document.getElementById('manualMode').classList.remove('bg-red-600', 'text-white');
-                document.getElementById('manualMode').classList.add('bg-gray-200');
-                document.getElementById('autoWeightSection').classList.remove('hidden');
-                document.getElementById('manualWeightSection').classList.add('hidden');
-            } else {
-                document.getElementById('manualMode').classList.add('bg-red-600', 'text-white');
-                document.getElementById('manualMode').classList.remove('bg-gray-200');
-                document.getElementById('autoMode').classList.remove('bg-red-600', 'text-white');
-                document.getElementById('autoMode').classList.add('bg-gray-200');
-                document.getElementById('autoWeightSection').classList.add('hidden');
-                document.getElementById('manualWeightSection').classList.remove('hidden');
-            }
-        }
-
-        // Auto weight simulation
-        function startAutoWeightSimulation() {
-            autoWeightInterval = setInterval(() => {
-                if (weightMode === 'auto') {
-                    const weight = (Math.random() * 3 + 0.1).toFixed(2);
-                    document.getElementById('autoWeight').textContent = weight;
-                }
-            }, 1500);
-        }
-
-        // Load products to sales
-        function loadProductsToSales() {
-            const container = document.getElementById('productsList');
-            container.innerHTML = '';
-
-            products.forEach(product => {
-                const div = document.createElement('div');
-                div.className = 'border rounded-lg p-4 hover:shadow-lg cursor-pointer transition';
-                div.onclick = () => selectProduct(product);
-                div.innerHTML = `
-                    <h3 class="font-bold text-lg mb-1">${product.name}</h3>
-                    <p class="text-sm text-gray-600 mb-2">${product.category}</p>
-                    <p class="text-xl font-bold text-red-600">$${product.price.toFixed(2)}/kg</p>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        // Select product for weighing
-        function selectProduct(product) {
-            selectedProductForWeight = product;
-            document.getElementById('selectedProduct').classList.remove('hidden');
-            document.getElementById('selectedProductName').textContent = product.name;
-        }
-
-        // Add to cart
-        function addToCart() {
-            if (!selectedProductForWeight) {
-                alert('Por favor selecciona un producto primero');
-                return;
-            }
-
-            let weight;
-            if (weightMode === 'auto') {
-                weight = parseFloat(document.getElementById('autoWeight').textContent);
-            } else {
-                weight = parseFloat(document.getElementById('manualWeight').value);
-                if (!weight || weight <= 0) {
-                    alert('Por favor ingresa un peso válido');
-                    return;
-                }
-            }
-
-            const subtotal = weight * selectedProductForWeight.price;
-            cart.push({
-                product: selectedProductForWeight,
-                weight: weight,
-                subtotal: subtotal
-            });
-
-            updateCart();
-            document.getElementById('manualWeight').value = '';
-            selectedProductForWeight = null;
-            document.getElementById('selectedProduct').classList.add('hidden');
-        }
-
-        // Update cart display
-        function updateCart() {
-            const container = document.getElementById('cartItems');
-            const totalEl = document.getElementById('cartTotal');
-
-            if (cart.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">Carrito vacío</p>';
-                totalEl.textContent = '$0.00';
-                return;
-            }
-
-            container.innerHTML = '';
-            let total = 0;
-
-            cart.forEach((item, index) => {
-                total += item.subtotal;
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-start p-3 bg-gray-50 rounded';
-                div.innerHTML = `
-                    <div class="flex-1">
-                        <p class="font-medium">${item.product.name}</p>
-                        <p class="text-sm text-gray-600">${item.weight.toFixed(2)} kg × $${item.product.price.toFixed(2)}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="font-bold">$${item.subtotal.toFixed(2)}</p>
-                        <button onclick="removeFromCart(${index})" class="text-red-600 text-sm hover:underline">
-                            Eliminar
-                        </button>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-
-            totalEl.textContent = '$' + total.toFixed(2);
-        }
-
-        // Remove from cart
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            updateCart();
-        }
-
-        // Clear cart
-        function clearCart() {
-            if (cart.length === 0) return;
-            if (confirm('¿Seguro que deseas vaciar el carrito?')) {
-                cart = [];
-                updateCart();
-            }
-        }
-
-        // Process checkout
-        function processCheckout() {
-            if (cart.length === 0) {
-                alert('El carrito está vacío');
-                return;
-            }
-
-            showInvoice();
-        }
-
-        // Show invoice
-        function showInvoice() {
-            const modal = document.getElementById('invoiceModal');
-            const itemsContainer = document.getElementById('invoiceItems');
-            
-            const saleDate = new Date();
-            const invoiceNum = invoiceCounter.toString().padStart(6, '0');
-            
-            // Set invoice details
-            document.getElementById('invoiceNumber').textContent = invoiceNum;
-            document.getElementById('invoiceDate').textContent = saleDate.toLocaleString('es-CO');
-            document.getElementById('invoiceUser').textContent = currentUser;
-
-            // Add items
-            itemsContainer.innerHTML = '';
-            let total = 0;
-
-            cart.forEach(item => {
-                total += item.subtotal;
-                const tr = document.createElement('tr');
-                tr.className = 'border-b';
-                tr.innerHTML = `
-                    <td class="py-2">${item.product.name}</td>
-                    <td class="text-right">${item.weight.toFixed(2)}</td>
-                    <td class="text-right">$${item.product.price.toFixed(2)}</td>
-                    <td class="text-right font-bold">$${item.subtotal.toFixed(2)}</td>
-                `;
-                itemsContainer.appendChild(tr);
-            });
-
-            document.getElementById('invoiceTotal').textContent = '$' + total.toFixed(2);
-
-            // Save sale to history
-            const sale = {
-                invoiceNumber: invoiceNum,
-                date: saleDate.toISOString(),
-                user: currentUser,
-                items: JSON.parse(JSON.stringify(cart)),
-                total: total
-            };
-            salesHistory.push(sale);
-
-            modal.classList.remove('hidden');
-
-            // Increment invoice counter
-            invoiceCounter++;
-            saveData();
-            updateStats();
-        }
-
-        // Print invoice
-        function printInvoice() {
-            window.print();
-        }
-
-        // Close invoice
-        function closeInvoice() {
-            document.getElementById('invoiceModal').classList.add('hidden');
-            cart = [];
-            updateCart();
-        }
-
-        // Add product (admin)
-        function addProduct(event) {
-            event.preventDefault();
-
-            const name = document.getElementById('productName').value;
-            const price = parseFloat(document.getElementById('productPrice').value);
-            const category = document.getElementById('productCategory').value;
-
-            const newProduct = {
-                id: Date.now(),
-                name: name,
-                price: price,
-                category: category
-            };
-
-            products.push(newProduct);
-            saveData();
-
-            // Reset form
-            document.getElementById('productName').value = '';
-            document.getElementById('productPrice').value = '';
-
-            loadProductsToSales();
-            loadProductsToAdmin();
-            updateStats();
-
-            alert('Producto agregado exitosamente');
-        }
-
-        // Load products to admin
-        function loadProductsToAdmin() {
-            const container = document.getElementById('adminProductsList');
-            if (!container) return;
-            
-            container.innerHTML = '';
-
-            if (products.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-4">No hay productos registrados</p>';
-                return;
-            }
-
-            products.forEach(product => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded';
-                div.innerHTML = `
+                <div class="grid grid-cols-2 gap-6 mb-6">
                     <div>
-                        <p class="font-medium">${product.name}</p>
-                        <p class="text-sm text-gray-600">${product.category} - $${product.price.toFixed(2)}/kg</p>
+                        <p class="text-sm text-gray-600">Ticket #:</p>
+                        <p id="ticketNumber" class="text-lg font-bold"></p>
                     </div>
-                    <button onclick="deleteProduct(${product.id})" class="text-red-600 hover:text-red-800">
-                        🗑️
-                    </button>
-                `;
-                container.appendChild(div);
-            });
-        }
+                    <div>
+                        <p class="text-sm text-gray-600">Fecha:</p>
+                        <p id="ticketDate" class="text-lg font-bold"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Placa:</p>
+                        <p id="ticketPlate" class="text-lg font-bold"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Conductor:</p>
+                        <p id="ticketDriver" class="text-lg"></p>
+                    </div>
+                </div>
 
-        // Delete product
-        function deleteProduct(id) {
-            if (confirm('¿Seguro que deseas eliminar este producto?')) {
-                products = products.filter(p => p.id !== id);
-                saveData();
-                loadProductsToSales();
-                loadProductsToAdmin();
-                updateStats();
-            }
-        }
+                <div class="border rounded-lg p-4 bg-gray-50 mb-6">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1">Peso Entrada</p>
+                            <p id="ticketEntryWeight" class="text-2xl font-bold text-blue-600">-</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1">Peso Salida</p>
+                            <p id="ticketExitWeight" class="text-2xl font-bold text-green-600">-</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1">Peso Neto</p>
+                            <p id="ticketNetWeight" class="text-3xl font-bold text-purple-600">-</p>
+                        </div>
+                    </div>
+                </div>
 
-        // Save scale configuration
-        function saveScaleConfig() {
-            scaleConfig = {
-                port: document.getElementById('scalePort').value,
-                baud: document.getElementById('scaleBaud').value,
-                protocol: document.getElementById('scaleProtocol').value,
-                stabilization: document.getElementById('scaleStabilization').value
-            };
-            saveData();
-            alert('Configuración de balanza guardada exitosamente');
-        }
+                <div id="ticketOrderInfo" class="mb-6 hidden">
+                    <p class="text-sm text-gray-600 mb-2">Información del Pedido:</p>
+                    <div class="border rounded p-4">
+                        <p><strong>Pedido #:</strong> <span id="ticketOrderNumber"></span></p>
+                        <p><strong>Cliente:</strong> <span id="ticketCustomer"></span></p>
+                        <p><strong>Material:</strong> <span id="ticketMaterial"></span></p>
+                    </div>
+                </div>
 
-        // Load scale config to form
-        function loadScaleConfigToForm() {
-            if (scaleConfig.port) document.getElementById('scalePort').value = scaleConfig.port;
-            if (scaleConfig.baud) document.getElementById('scaleBaud').value = scaleConfig.baud;
-            if (scaleConfig.protocol) document.getElementById('scaleProtocol').value = scaleConfig.protocol;
-            if (scaleConfig.stabilization) document.getElementById('scaleStabilization').value = scaleConfig.stabilization;
-        }
+                <div class="text-center text-sm text-gray-500 border-t pt-4">
+                    <p>Sistema de Gestión para Cantera</p>
+                    <p>Pesaje verificado electrónicamente</p>
+                </div>
+            </div>
 
-        // Load sales history
-        function loadSalesHistory() {
-            const tbody = document.getElementById('salesTableBody');
-            if (!tbody) return;
+            <div class="flex gap-4 mt-6 no-print">
+                <button onclick="window.print()" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700">
+                    🖨️ Imprimir
+                </button>
+                <button onclick="closeModal('weighTicketModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
 
-            tbody.innerHTML = '';
-
-            if (filteredSales.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No hay ventas registradas</td></tr>';
-                return;
-            }
-
-            filteredSales.forEach(sale => {
-                const tr = document.createElement('tr');
-                tr.className = 'border-b hover:bg-gray-50';
-                
-                const date = new Date(sale.date);
-                const itemsSummary = sale.items.map(item => item.product.name).join(', ');
-                
-                tr.innerHTML = `
-                    <td class="p-3">#${sale.invoiceNumber}</td>
-                    <td class="p-3">${date.toLocaleString('es-CO')}</td>
-                    <td class="p-3">${sale.user}</td>
-                    <td class="p-3 text-sm">${itemsSummary}</td>
-                    <td class="p-3 text-right font-bold">$${sale.total.toFixed(2)}</td>
-                    <td class="p-3 text-center">
-                        <button onclick="viewSaleDetail(${salesHistory.indexOf(sale)})" class="text-blue-600 hover:underline text-sm">
-                            Ver Detalle
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Filter sales
-        function filterSales() {
-            const dateFrom = document.getElementById('filterDateFrom').value;
-            const dateTo = document.getElementById('filterDateTo').value;
-            const user = document.getElementById('filterUser').value;
-
-            filteredSales = salesHistory.filter(sale => {
-                const saleDate = new Date(sale.date).toISOString().split('T')[0];
-                
-                const dateMatch = (!dateFrom || saleDate >= dateFrom) && 
-                                 (!dateTo || saleDate <= dateTo);
-                const userMatch = !user || sale.user === user;
-                
-                return dateMatch && userMatch;
-            });
-
-            // Update summary
-            const total = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
-            const count = filteredSales.length;
-            const average = count > 0 ? total / count : 0;
-
-            document.getElementById('filteredTotal').textContent = '$' + total.toFixed(2);
-            document.getElementById('filteredCount').textContent = count;
-            document.getElementById('filteredAverage').textContent = '$' + average.toFixed(2);
-
-            loadSalesHistory();
-        }
-
-        // View sale detail
-        function viewSaleDetail(index) {
-            const sale = salesHistory[index];
-            let detail = `Factura #${sale.invoiceNumber}\n`;
-            detail += `Fecha: ${new Date(sale.date).toLocaleString('es-CO')}\n`;
-            detail += `Usuario: ${sale.user}\n\n`;
-            detail += `Productos:\n`;
-            
-            sale.items.forEach(item => {
-                detail += `- ${item.product.name}: ${item.weight.toFixed(2)} kg × $${item.product.price.toFixed(2)} = $${item.subtotal.toFixed(2)}\n`;
-            });
-            
-            detail += `\nTotal: $${sale.total.toFixed(2)}`;
-            
-            alert(detail);
-        }
-
-        // Export sales to CSV
-        function exportSales() {
-            if (filteredSales.length === 0) {
-                alert('No hay ventas para exportar');
-                return;
-            }
-
-            let csv = 'Factura,Fecha,Usuario,Productos,Total\n';
-            
-            filteredSales.forEach(sale => {
-                const date = new Date(sale.date).toLocaleString('es-CO');
-                const items = sale.items.map(item => `${item.product.name} (${item.weight.toFixed(2)}kg)`).join(' | ');
-                csv += `#${sale.invoiceNumber},"${date}",${sale.user},"${items}",${sale.total.toFixed(2)}\n`;
-            });
-
-            // Create download link
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `ventas_${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Print sales report
-        function printSalesReport() {
-            if (filteredSales.length === 0) {
-                alert('No hay ventas para imprimir');
-                return;
-            }
-
-            const modal = document.getElementById('salesReportModal');
-            const tbody = document.getElementById('reportTableBody');
-
-            // Set report details
-            document.getElementById('reportDate').textContent = new Date().toLocaleString('es-CO');
-            
-            const dateFrom = document.getElementById('filterDateFrom').value;
-            const dateTo = document.getElementById('filterDateTo').value;
-            let period = 'Todas las ventas';
-            if (dateFrom && dateTo) {
-                period = `${dateFrom} al ${dateTo}`;
-            } else if (dateFrom) {
-                period = `Desde ${dateFrom}`;
-            } else if (dateTo) {
-                period = `Hasta ${dateTo}`;
-            }
-            document.getElementById('reportPeriod').textContent = period;
-
-            // Set summary
-            const total = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
-            const count = filteredSales.length;
-            const average = count > 0 ? total / count : 0;
-
-            document.getElementById('reportTotalSales').textContent = '$' + total.toFixed(2);
-            document.getElementById('reportTransactions').textContent = count;
-            document.getElementById('reportAverage').textContent = '$' + average.toFixed(2);
-
-            // Add sales to table
-            tbody.innerHTML = '';
-            filteredSales.forEach(sale => {
-                const tr = document.createElement('tr');
-                tr.className = 'border-b';
-                
-                const date = new Date(sale.date);
-                const itemsSummary = sale.items.map(item => item.product.name).join(', ');
-                
-                tr.innerHTML = `
-                    <td class="p-2">#${sale.invoiceNumber}</td>
-                    <td class="p-2">${date.toLocaleDateString('es-CO')}</td>
-                    <td class="p-2">${sale.user}</td>
-                    <td class="p-2 text-sm">${itemsSummary}</td>
-                    <td class="p-2 text-right font-bold">$${sale.total.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            modal.classList.remove('hidden');
-        }
-
-        // Close sales report
-        function closeSalesReport() {
-            document.getElementById('salesReportModal').classList.add('hidden');
-        }
-
-        // Initialize when page loads
-        window.onload = initApp;
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
