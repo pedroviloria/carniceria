@@ -16,7 +16,13 @@ let weighingCounter = 1;
 // Initialize App
 function initApp() {
     loadData();
-    if (materials.length === 0) loadDefaultData();
+    // Load default data if starting fresh OR if machines are missing (backwards compatibility)
+    if (materials.length === 0) {
+        loadDefaultData();
+    } else if (machines.length === 0) {
+        // Add default machines if they don't exist
+        loadDefaultMachines();
+    }
     startAutoWeightSimulation();
     setTodayDates();
 }
@@ -79,6 +85,16 @@ function loadDefaultData() {
         { id: 3, name: 'Cargadora Komatsu WA380', code: 'KOM380', type: 'Cargadora Frontal', operator: 'Roberto Silva', username: 'maquina3', password: 'maq123', status: 'available' }
     ];
 
+    saveData();
+}
+
+// Load default machines only (for backwards compatibility)
+function loadDefaultMachines() {
+    machines = [
+        { id: 1, name: 'Cargadora CAT 950', code: 'CAT950', type: 'Cargadora Frontal', operator: 'Carlos Rodríguez', username: 'maquina1', password: 'maq123', status: 'available' },
+        { id: 2, name: 'Excavadora JCB 220', code: 'JCB220', type: 'Excavadora', operator: 'Luis Martínez', username: 'maquina2', password: 'maq123', status: 'available' },
+        { id: 3, name: 'Cargadora Komatsu WA380', code: 'KOM380', type: 'Cargadora Frontal', operator: 'Roberto Silva', username: 'maquina3', password: 'maq123', status: 'available' }
+    ];
     saveData();
 }
 
