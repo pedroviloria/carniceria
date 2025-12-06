@@ -55,6 +55,10 @@
                     <p><strong>Admin:</strong> admin / admin123</p>
                     <p><strong>Operador:</strong> operador / operador123</p>
                     <p><strong>Báscula:</strong> bascula / bascula123</p>
+                    <p class="mt-2 font-semibold">Máquinas:</p>
+                    <p><strong>Máquina 1:</strong> maquina1 / maq123</p>
+                    <p><strong>Máquina 2:</strong> maquina2 / maq123</p>
+                    <p><strong>Máquina 3:</strong> maquina3 / maq123</p>
                 </div>
             </div>
         </div>
@@ -105,6 +109,12 @@
                     </button>
                     <button onclick="showTab('vehicles')" id="tabVehicles" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
                         🚛 Vehículos
+                    </button>
+                    <button onclick="showTab('machines')" id="tabMachines" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        🏗️ Máquinas
+                    </button>
+                    <button onclick="showTab('machineOrders')" id="tabMachineOrders" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
+                        📦 Mis Pedidos
                     </button>
                     <button onclick="showTab('reports')" id="tabReports" class="nav-tab px-6 py-3 font-medium text-gray-500 hidden">
                         📈 Reportes
@@ -227,12 +237,13 @@
                             <th class="text-right p-4">Cantidad (Ton)</th>
                             <th class="text-right p-4">Entregado (Ton)</th>
                             <th class="text-left p-4">Fecha Entrega</th>
+                            <th class="text-left p-4">Máquina</th>
                             <th class="text-left p-4">Estado</th>
                             <th class="text-center p-4">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="ordersTableBody">
-                        <tr><td colspan="8" class="text-center py-8 text-gray-500">No hay pedidos registrados</td></tr>
+                        <tr><td colspan="9" class="text-center py-8 text-gray-500">No hay pedidos registrados</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -375,6 +386,48 @@
             </div>
         </div>
 
+        <!-- Machines Section -->
+        <div id="machinesSection" class="container mx-auto p-6 hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Gestión de Máquinas</h2>
+                <button onclick="showNewMachineModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    ➕ Nueva Máquina
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100 border-b">
+                        <tr>
+                            <th class="text-left p-4">Código</th>
+                            <th class="text-left p-4">Nombre</th>
+                            <th class="text-left p-4">Tipo</th>
+                            <th class="text-left p-4">Operador</th>
+                            <th class="text-left p-4">Estado</th>
+                            <th class="text-center p-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="machinesTableBody">
+                        <tr><td colspan="6" class="text-center py-8 text-gray-500">No hay máquinas registradas</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Machine Orders Section (for machine operators) -->
+        <div id="machineOrdersSection" class="container mx-auto p-6 hidden">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold mb-2">Mis Pedidos Pendientes</h2>
+                <p class="text-gray-600">Aquí aparecen los pedidos asignados a tu máquina que están pendientes de carga</p>
+            </div>
+
+            <div id="machineOrdersContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="text-center py-12">
+                    <p class="text-gray-500 text-lg">No tienes pedidos pendientes asignados</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Reports Section -->
         <div id="reportsSection" class="container mx-auto p-6 hidden">
             <h2 class="text-2xl font-bold mb-6">Reportes y Estadísticas</h2>
@@ -478,6 +531,12 @@
                         <label class="block text-sm font-medium mb-1">Fecha de Entrega *</label>
                         <input type="date" id="orderDeliveryDate" required class="w-full p-3 border rounded-lg">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Máquina Asignada *</label>
+                    <select id="orderMachine" required class="w-full p-3 border rounded-lg">
+                        <option value="">Seleccionar máquina...</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Observaciones</label>
@@ -615,6 +674,58 @@
                         Crear Vehículo
                     </button>
                     <button type="button" onclick="closeModal('newVehicleModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Machine Modal -->
+    <div id="newMachineModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <h2 class="text-2xl font-bold mb-6">Nueva Máquina</h2>
+            <form onsubmit="createMachine(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Código *</label>
+                        <input type="text" id="machineCode" required class="w-full p-3 border rounded-lg uppercase" placeholder="CAT950">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Nombre *</label>
+                        <input type="text" id="machineName" required class="w-full p-3 border rounded-lg" placeholder="Cargadora CAT 950">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tipo de Máquina</label>
+                    <select id="machineType" class="w-full p-3 border rounded-lg">
+                        <option value="Cargadora Frontal">Cargadora Frontal</option>
+                        <option value="Excavadora">Excavadora</option>
+                        <option value="Retroexcavadora">Retroexcavadora</option>
+                        <option value="Bulldozer">Bulldozer</option>
+                        <option value="Motoniveladora">Motoniveladora</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Operador *</label>
+                    <input type="text" id="machineOperator" required class="w-full p-3 border rounded-lg" placeholder="Nombre del operador">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Usuario de Acceso *</label>
+                        <input type="text" id="machineUsername" required class="w-full p-3 border rounded-lg" placeholder="maquina1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Contraseña *</label>
+                        <input type="password" id="machinePassword" required class="w-full p-3 border rounded-lg" placeholder="contraseña">
+                    </div>
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        Crear Máquina
+                    </button>
+                    <button type="button" onclick="closeModal('newMachineModal')" class="px-6 bg-gray-300 text-gray-700 p-3 rounded-lg hover:bg-gray-400">
                         Cancelar
                     </button>
                 </div>

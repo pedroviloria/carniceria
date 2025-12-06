@@ -1,9 +1,11 @@
 // Global State
 let currentUser = null;
 let userRole = null;
+let currentMachineId = null; // For machine operators
 let customers = [];
 let materials = [];
 let vehicles = [];
+let machines = [];
 let orders = [];
 let weighings = [];
 let filteredOrders = [];
@@ -24,6 +26,7 @@ function loadData() {
     const savedCustomers = localStorage.getItem('quarry_customers');
     const savedMaterials = localStorage.getItem('quarry_materials');
     const savedVehicles = localStorage.getItem('quarry_vehicles');
+    const savedMachines = localStorage.getItem('quarry_machines');
     const savedOrders = localStorage.getItem('quarry_orders');
     const savedWeighings = localStorage.getItem('quarry_weighings');
     const savedOrderCounter = localStorage.getItem('quarry_orderCounter');
@@ -32,6 +35,7 @@ function loadData() {
     if (savedCustomers) customers = JSON.parse(savedCustomers);
     if (savedMaterials) materials = JSON.parse(savedMaterials);
     if (savedVehicles) vehicles = JSON.parse(savedVehicles);
+    if (savedMachines) machines = JSON.parse(savedMachines);
     if (savedOrders) orders = JSON.parse(savedOrders);
     if (savedWeighings) weighings = JSON.parse(savedWeighings);
     if (savedOrderCounter) orderCounter = parseInt(savedOrderCounter);
@@ -43,6 +47,7 @@ function saveData() {
     localStorage.setItem('quarry_customers', JSON.stringify(customers));
     localStorage.setItem('quarry_materials', JSON.stringify(materials));
     localStorage.setItem('quarry_vehicles', JSON.stringify(vehicles));
+    localStorage.setItem('quarry_machines', JSON.stringify(machines));
     localStorage.setItem('quarry_orders', JSON.stringify(orders));
     localStorage.setItem('quarry_weighings', JSON.stringify(weighings));
     localStorage.setItem('quarry_orderCounter', orderCounter.toString());
@@ -66,6 +71,12 @@ function loadDefaultData() {
     vehicles = [
         { id: 1, plate: 'ABC-123', type: 'Volqueta', capacity: 15, driver: 'Juan Pérez', status: 'available' },
         { id: 2, plate: 'XYZ-789', type: 'Camión', capacity: 10, driver: 'María García', status: 'available' }
+    ];
+
+    machines = [
+        { id: 1, name: 'Cargadora CAT 950', code: 'CAT950', type: 'Cargadora Frontal', operator: 'Carlos Rodríguez', username: 'maquina1', password: 'maq123', status: 'available' },
+        { id: 2, name: 'Excavadora JCB 220', code: 'JCB220', type: 'Excavadora', operator: 'Luis Martínez', username: 'maquina2', password: 'maq123', status: 'available' },
+        { id: 3, name: 'Cargadora Komatsu WA380', code: 'KOM380', type: 'Cargadora Frontal', operator: 'Roberto Silva', username: 'maquina3', password: 'maq123', status: 'available' }
     ];
 
     saveData();
@@ -99,7 +110,16 @@ function login() {
         userRole = 'scale';
         showMainApp();
     } else {
-        alert('Usuario o contraseña incorrectos');
+        // Check if it's a machine operator
+        const machine = machines.find(m => m.username === user && m.password === pass);
+        if (machine) {
+            currentUser = machine.operator + ' (' + machine.name + ')';
+            userRole = 'machine';
+            currentMachineId = machine.id;
+            showMainApp();
+        } else {
+            alert('Usuario o contraseña incorrectos');
+        }
     }
 }
 
@@ -111,13 +131,28 @@ function showMainApp() {
 
     // Show tabs based on role
     if (userRole === 'admin') {
-        ['tabCustomers', 'tabMaterials', 'tabVehicles', 'tabReports'].forEach(id => {
-            document.getElementById(id).classList.remove('hidden');
+        ['tabCustomers', 'tabMaterials', 'tabVehicles', 'tabMachines', 'tabReports'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('hidden');
         });
+    }
+
+    // Machine operators only see their assigned orders
+    if (userRole === 'machine') {
+        ['tabDashboard', 'tabOrders', 'tabWeighing'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        const machineOrdersTab = document.getElementById('tabMachineOrders');
+        if (machineOrdersTab) machineOrdersTab.classList.remove('hidden');
+        loadMachineOrders();
+        showTab('machineOrders');
+        return;
     }
 
     loadCustomersToSelect();
     loadMaterialsToSelect();
+    loadMachinesToSelect();
     loadDashboard();
     showTab('dashboard');
 }
@@ -126,6 +161,7 @@ function showMainApp() {
 function logout() {
     currentUser = null;
     userRole = null;
+    currentMachineId = null;
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('mainApp').classList.add('hidden');
     document.getElementById('loginUser').value = '';
@@ -135,8 +171,11 @@ function logout() {
 // Show tab
 function showTab(tab) {
     // Hide all sections
-    const sections = ['dashboardSection', 'ordersSection', 'weighingSection', 'customersSection', 'materialsSection', 'vehiclesSection', 'reportsSection'];
-    sections.forEach(s => document.getElementById(s).classList.add('hidden'));
+    const sections = ['dashboardSection', 'ordersSection', 'weighingSection', 'customersSection', 'materialsSection', 'vehiclesSection', 'machinesSection', 'machineOrdersSection', 'reportsSection'];
+    sections.forEach(s => {
+        const el = document.getElementById(s);
+        if (el) el.classList.add('hidden');
+    });
 
     // Remove active class from all tabs
     document.querySelectorAll('.nav-tab').forEach(t => {
@@ -145,10 +184,14 @@ function showTab(tab) {
     });
 
     // Show selected section
-    document.getElementById(tab + 'Section').classList.remove('hidden');
+    const sectionEl = document.getElementById(tab + 'Section');
+    if (sectionEl) sectionEl.classList.remove('hidden');
+
     const activeTab = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-    activeTab.classList.add('border-blue-600', 'text-black');
-    activeTab.classList.remove('text-gray-500');
+    if (activeTab) {
+        activeTab.classList.add('border-blue-600', 'text-black');
+        activeTab.classList.remove('text-gray-500');
+    }
 
     // Load data for section
     if (tab === 'dashboard') loadDashboard();
@@ -157,6 +200,8 @@ function showTab(tab) {
     else if (tab === 'customers') loadCustomers();
     else if (tab === 'materials') loadMaterials();
     else if (tab === 'vehicles') loadVehicles();
+    else if (tab === 'machines') loadMachines();
+    else if (tab === 'machineOrders') loadMachineOrders();
     else if (tab === 'reports') generateReports();
 }
 
@@ -235,6 +280,7 @@ function loadDashboard() {
 function showNewOrderModal() {
     loadCustomersToSelect();
     loadMaterialsToSelect();
+    loadMachinesToSelect();
     document.getElementById('newOrderModal').classList.remove('hidden');
 }
 
@@ -243,15 +289,22 @@ function createOrder(event) {
 
     const customerId = parseInt(document.getElementById('orderCustomer').value);
     const materialId = parseInt(document.getElementById('orderMaterial').value);
+    const machineId = parseInt(document.getElementById('orderMachine').value);
     const quantity = parseFloat(document.getElementById('orderQuantity').value);
     const deliveryDate = document.getElementById('orderDeliveryDate').value;
     const notes = document.getElementById('orderNotes').value;
+
+    if (!machineId) {
+        alert('Por favor selecciona una máquina para asignar el pedido');
+        return;
+    }
 
     const order = {
         id: Date.now(),
         number: orderCounter.toString().padStart(6, '0'),
         customerId,
         materialId,
+        machineId,
         quantity,
         delivered: 0,
         deliveryDate,
@@ -297,7 +350,7 @@ function filterOrders() {
 function displayOrders() {
     const tbody = document.getElementById('ordersTableBody');
     if (filteredOrders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No hay pedidos que coincidan con los filtros</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-gray-500">No hay pedidos que coincidan con los filtros</td></tr>';
         return;
     }
 
@@ -305,6 +358,7 @@ function displayOrders() {
     filteredOrders.forEach(order => {
         const customer = customers.find(c => c.id === order.customerId);
         const material = materials.find(m => m.id === order.materialId);
+        const machine = machines.find(m => m.id === order.machineId);
         const tr = document.createElement('tr');
         tr.className = 'border-b hover:bg-gray-50';
         tr.innerHTML = `
@@ -314,6 +368,7 @@ function displayOrders() {
             <td class="p-4 text-right">${order.quantity.toFixed(2)}</td>
             <td class="p-4 text-right">${order.delivered.toFixed(2)}</td>
             <td class="p-4">${new Date(order.deliveryDate).toLocaleDateString()}</td>
+            <td class="p-4 text-sm">${machine?.code || 'N/A'}</td>
             <td class="p-4"><span class="status-badge status-${order.status}">${getStatusText(order.status)}</span></td>
             <td class="p-4 text-center">
                 <button onclick="viewOrderDetail(${order.id})" class="text-blue-600 hover:underline text-sm">Ver</button>
@@ -847,6 +902,172 @@ function exportReportCSV() {
 
 function printReport() {
     window.print();
+}
+
+// Machine Management
+function showNewMachineModal() {
+    document.getElementById('newMachineModal').classList.remove('hidden');
+}
+
+function createMachine(event) {
+    event.preventDefault();
+
+    const machine = {
+        id: Date.now(),
+        name: document.getElementById('machineName').value,
+        code: document.getElementById('machineCode').value.toUpperCase(),
+        type: document.getElementById('machineType').value,
+        operator: document.getElementById('machineOperator').value,
+        username: document.getElementById('machineUsername').value,
+        password: document.getElementById('machinePassword').value,
+        status: 'available'
+    };
+
+    machines.push(machine);
+    saveData();
+
+    closeModal('newMachineModal');
+    event.target.reset();
+    loadMachines();
+    loadMachinesToSelect();
+    alert('Máquina creada exitosamente');
+}
+
+function loadMachines() {
+    const tbody = document.getElementById('machinesTableBody');
+    if (!tbody) return;
+
+    if (machines.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No hay máquinas registradas</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    machines.forEach(machine => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b hover:bg-gray-50';
+        const statusText = machine.status === 'available' ? 'Disponible' : 'En uso';
+        const statusClass = machine.status === 'available' ? 'text-green-600' : 'text-orange-600';
+        tr.innerHTML = `
+            <td class="p-4 font-semibold">${machine.code}</td>
+            <td class="p-4">${machine.name}</td>
+            <td class="p-4">${machine.type}</td>
+            <td class="p-4">${machine.operator}</td>
+            <td class="p-4"><span class="${statusClass}">${statusText}</span></td>
+            <td class="p-4 text-center">
+                <button onclick="deleteMachine(${machine.id})" class="text-red-600 hover:underline text-sm">Eliminar</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function deleteMachine(id) {
+    if (confirm('¿Está seguro de eliminar esta máquina?')) {
+        machines = machines.filter(m => m.id !== id);
+        saveData();
+        loadMachines();
+        loadMachinesToSelect();
+    }
+}
+
+function loadMachinesToSelect() {
+    const select = document.getElementById('orderMachine');
+    if (!select) return;
+    select.innerHTML = '<option value="">Seleccionar máquina...</option>';
+    machines.forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = `${m.code} - ${m.name}`;
+        select.appendChild(option);
+    });
+}
+
+// Machine Orders View (for machine operators)
+function loadMachineOrders() {
+    const container = document.getElementById('machineOrdersContainer');
+    if (!container) return;
+
+    // Get only pending orders assigned to this machine
+    const myOrders = orders.filter(o => o.machineId === currentMachineId && o.status === 'pending');
+
+    if (myOrders.length === 0) {
+        container.innerHTML = '<div class="text-center py-12"><p class="text-gray-500 text-lg">No tienes pedidos pendientes asignados</p></div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    myOrders.forEach(order => {
+        const customer = customers.find(c => c.id === order.customerId);
+        const material = materials.find(m => m.id === order.materialId);
+        const machine = machines.find(m => m.id === order.machineId);
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-lg shadow-lg p-6';
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-2xl font-bold text-blue-600">Pedido #${order.number}</h3>
+                    <p class="text-sm text-gray-500 mt-1">Creado: ${new Date(order.createdAt).toLocaleString()}</p>
+                </div>
+                <span class="status-badge status-${order.status}">${getStatusText(order.status)}</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Cliente</p>
+                    <p class="font-semibold text-lg">${customer?.name || 'N/A'}</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Material</p>
+                    <p class="font-semibold text-lg">${material?.name || 'N/A'}</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Cantidad Solicitada</p>
+                    <p class="font-bold text-2xl text-blue-600">${order.quantity.toFixed(2)} Ton</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Cantidad Entregada</p>
+                    <p class="font-bold text-2xl text-green-600">${order.delivered.toFixed(2)} Ton</p>
+                </div>
+                <div class="bg-orange-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Cantidad Pendiente</p>
+                    <p class="font-bold text-2xl text-orange-600">${(order.quantity - order.delivered).toFixed(2)} Ton</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">Fecha de Entrega</p>
+                    <p class="font-semibold text-lg">${new Date(order.deliveryDate).toLocaleDateString()}</p>
+                </div>
+            </div>
+
+            ${order.notes ? `<div class="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400"><p class="text-sm"><strong>Observaciones:</strong> ${order.notes}</p></div>` : ''}
+
+            <div class="flex gap-3">
+                <button onclick="markOrderAsDelivered(${order.id})" class="flex-1 bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 font-semibold transition">
+                    ✅ Marcar como Cargado y Entregado
+                </button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function markOrderAsDelivered(orderId) {
+    if (!confirm('¿Confirmas que este pedido ha sido cargado completamente y está listo para entrega?')) {
+        return;
+    }
+
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    order.status = 'delivered';
+    order.delivered = order.quantity;
+    order.completedAt = new Date().toISOString();
+    order.completedBy = currentUser;
+
+    saveData();
+    loadMachineOrders();
+    alert('Pedido #' + order.number + ' marcado como entregado exitosamente');
 }
 
 // Utility functions
